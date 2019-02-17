@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Grapher</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="css-element-queries/src/ResizeSensor.js"></script>
+        <script src="css-element-queries/src/ElementQueries.js"></script>
+    </head>
+    <body>
+        <!--<header><h1>linear</h1></header>-->
+        <div class="wrapper">
+            <div class="side" id="left">
+                <div class="modes-wrapper">
+                    <h1 class="side-heading">Modes</h1>
+                    <div class="modes settings-category"><!---->
+                        <input type='button' name='mode' class='mode' value='Pan'>
+                        <input type='button' name='mode' class='mode' value='Move'>
+                        <input type='button' name='mode' class='mode' value='Vector'>
+                        <input type='button' name='mode' class='mode' value='Segment'>
+                        <input type='button' name='mode' class='mode' value='Draw'>
+                        <input type='button' name='mode' class='mode' value='Line'>
+                        <input type='button' name='mode' class='mode' value='Fix'>
+                    </div>
+                </div>
+                <div class="toggles-wrapper">
+                    <h1 class="side-heading">Toggles</h1>
+                    <div class="toggles settings-category">
+                        <label class="label">
+                            <input type="checkbox" name="toggle" class='toggle' value='focusZoom'>
+                            Focused Zooming
+                        </label>
+                        <label class="label">
+                            <input type="checkbox" name="toggle" class='toggle' value='selecting'>
+                            Selecting
+                        </label>
+                        <label class="label">
+                            <input type="checkbox" name="toggle" class='toggle' value='rescaleContent'>
+                            Rescale Content
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div id='canvas-wrapper'><canvas id='canvas'></canvas></div>
+            <div class="side" id="right">
+                <div class="objects">
+                    <h1 class="side-heading">Objects</h1>
+                    <ul id="object-list">
+                    </ul>
+                    <div class="properties-wrapper">
+                        <div class="properties no-display" name="vector">
+                            <h2 class="side-heading properties-heading">Vector</h2>
+                            <label name='vector-x'>
+                                x:
+                                <input type="text" name='vector-x'>
+                            </label>
+                            <label name='vector-y'>
+                                y:
+                                <input type="text" name='vector-y'>
+                            </label>
+                        </div>
+                        <div class="properties no-display" id="line">
+                            <h2 class="side-heading properties-heading" id='line-heading'>Line</h2>
+                            <ul id="object-children"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script src="script.js"></script>
+</html>
