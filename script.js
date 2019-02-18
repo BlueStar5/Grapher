@@ -263,15 +263,19 @@ var commands = {
       var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
       if (settings.selecting && settings.selected) {
-        vector = plane.getVector(settings.selected);
-        if (!vector) {
-          vector = plane.getLine(settings.selected).pointClosestTo(canvasToGrid(new Vector(mouse.downX, mouse.downY)));
+        var vectorSelected = plane.getVector(settings.selected);
+        if (vectorSelected) {
+          vector = vectorSelected;
+        }
+        else {
+          var lineSelected = plane.getLine(settings.selected);
+          vector = lineSelected.pointClosestTo(vector);
           var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
           if (existingVector) {
             vector = existingVector;
           }
           else {
-            plane.getLine(settings.selected).addVector(vector);
+            vector.fixTo(lineSelected);
           }
         }
       }
@@ -407,8 +411,11 @@ function Vector(x, y, id) {
   this.endpointOf = [];
 
   this.constraints = {
-    fixed: false
+    fixedTo: []
   };
+  this.fixTo = function(obj) {
+    this.constraints.fixedTo.push(obj);
+  }
 
   this.transformations = [];
 
@@ -487,76 +494,27 @@ function Vector(x, y, id) {
     return angle;
   }
   this.translate = function(vector) {
-    var called = [];
-
-    var parents = this.parents;
-    if (this.constraints.fixed) {
-      return;
+    var image = this.add(vector);
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.length) {
+      this.setPosition(this.getClosest(
+        fixedTo.map(obj => obj.pointClosestTo(image)) // get the closest point of each object to this
+        .filter(point => fixedTo.every(obj => obj.onLine(point))) // keep only the points that are on all objects
+      ));
     }
-    called.push(this);
-    this.shift(vector);
-    this.setTransformation("translate", {vector: vector}, ui.transformations);
-
-    while (parents.filter(p => !p.transformations.some(t => t.id === ui.transformations)).length) {
-      parents.filter(p => !called.includes(p)).forEach(p => {
-        p.children.forEach(c => {
-          var childTransformations = c.transformations.filter(t => t.id === ui.transformations);
-          if (childTransformations.length) {
-            var fixedPoint = p.children.filter(point => point.constraints.fixed)[0];
-            if (fixedPoint) {
-              childTransformations.forEach(t => {
-                console.log(t);
-                console.log(p.id);
-                if (t.name === "translate") {
-                  var angle = c.angle(fixedPoint.clone()) - c.subtract(t.args.vector).angle(fixedPoint.clone());
-                  p.setTransformation("rotate", {center: fixedPoint.clone(), radians: angle}, ui.transformations);
-                }
-                if (t.name === "rotate") {
-                  p.setTransformation(t.name, t.args, ui.transformations);
-                }
-              });
-            }
-            else {
-              childTransformations.forEach(t => {
-                p.setTransformation(t.name, t.args, ui.transformations);
-              });
-            }
-          }
-          called.push(p);
-        });
-        p.children.forEach(c => {
-          if (c.constraints.fixed) {
-            called.push(c);
-          }
-          else {
-            if (!called.includes(c)) {
-              p.transformations.filter(t => t.id === ui.transformations).forEach(t => {
-                if (t.name === "translate") {
-                  c.shift(t.args.vector);
-                  c.setTransformation(t.name, t.args, ui.transformations);
-                  called.push(c);
-                }
-                if (t.name === "rotate") {
-                  c.rotate(t.args.center, t.args.radians);
-                  c.setTransformation(t.name, t.args, ui.transformations);
-                  called.push(c);
-                }
-              });
-            }
-            if (!called.includes(c)) {
-              c.shift(vector);
-              c.setTransformation("translate", {vector: vector}, ui.transformations);
-            }
-          }
-        });
-      });
-      var children = flattenArray(parents.map(p => p.children));
-      parents = flattenArray(children.map(c => c.parents));
+    else {
+      this.setPosition(image);
     }
-}
+  }
   this.shift = function(vector) {
     console.log("Vector " + this.id + " " + this.toString() + " has been shifted by " + vector.toString() + " to " + this.add(vector).toString() + ".");
     this.setPosition(this.add(vector));
+  }
+  this.getClosest = function(vectors) {
+    return vectors.reduce((closest, cur) => this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
+  }
+  this.distanceTo = function(vector) {
+    return vector.subtract(this).magnitude();
   }
   this.update = function() {
     console.log('yosa');
@@ -660,8 +618,11 @@ function LineSegment(p1, p2) {
   this.endpoints = [];
   this.intersections = {};
   this.constraints = {
-    fixed: false,
+    fixedTo: []
   };
+  this.fixTo = function(obj) {
+    this.constraints.fixedTo.push(obj);
+  }
   this.transformations = [
     /*
     {
@@ -1262,58 +1223,58 @@ function Camera(minX, minY, maxX, maxY, plane) {
       });
     };
 
-    this.resize = function(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY) {
-      this.min = this.min.add(new Vector(deltaMinX, deltaMinY));
-      this.max = this.max.add(new Vector(deltaMaxX, deltaMaxY));
-    };
+  this.resize = function(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY) {
+    this.min = this.min.add(new Vector(deltaMinX, deltaMinY));
+    this.max = this.max.add(new Vector(deltaMaxX, deltaMaxY));
+  };
 
-    this.dilate = function(factor) {
-      this.min = this.min.multiply(factor);
-      this.max = this.max.multiply(factor);
+  this.dilate = function(factor) {
+    this.min = this.min.multiply(factor);
+    this.max = this.max.multiply(factor);
+  }
+
+  this.scaleContent = function(change, translation) {
+    this.dilation *= change;
+    this.gridGap *= change;
+    this.perPixel /= change;
+
+    if (this.dilation <= 50) {
+      this.gridGap *= 2;
+      this.dilation = 100;
     }
-
-    this.scaleContent = function(change, translation) {
-      this.dilation *= change;
-      this.gridGap *= change;
-      this.perPixel /= change;
-
-      if (this.dilation <= 50) {
-        this.gridGap *= 2;
-        this.dilation = 100;
-      }
-      if (this.dilation >= 200) {
-        this.dilation = 100;
-        this.gridGap /= 2;
-      }
-      if (settings.focusZoom) {
-        // dilate about the mouse wheel point
-        this.translate(translation);
-        this.dilate(1 / change);
-        this.translate(translation.negative());
-        this.dilate(change);
-      }
-    };
-    this.translate = function(translation) {
-      this.min = this.min.add(translation);
-      this.max = this.max.add(translation);
+    if (this.dilation >= 200) {
+      this.dilation = 100;
+      this.gridGap /= 2;
     }
-
-    this.update = function() {
-      this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
-
-      ctx.fillStyle = settings.gridBackground;
-      ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
-
-      this.drawLines(this.plane.grid.lines, settings.gridLineColors);
-      this.drawLines(this.plane.lines);
-      this.drawVectors(this.plane.getVectors());
+    if (settings.focusZoom) {
+      // dilate about the mouse wheel point
+      this.translate(translation);
+      this.dilate(1 / change);
+      this.translate(translation.negative());
+      this.dilate(change);
     }
-    this.drawVectors = function(vectors) {
-      vectors.forEach(v => {
-        this.drawVector(v);
-      });
-    }
-    this.drawVector = function(v) {
+  };
+  this.translate = function(translation) {
+    this.min = this.min.add(translation);
+    this.max = this.max.add(translation);
+  }
+
+  this.update = function() {
+    this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
+
+    ctx.fillStyle = settings.gridBackground;
+    ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
+
+    this.drawLines(this.plane.grid.lines, settings.gridLineColors);
+    this.drawLines(this.plane.lines);
+    this.drawVectors(this.plane.getVectors());
+  }
+  this.drawVectors = function(vectors) {
+    vectors.forEach(v => {
+      this.drawVector(v);
+    });
+  }
+  this.drawVector = function(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
         var radius = settings.pointRadius;
         if (v.id === settings.selected) {
@@ -1322,7 +1283,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
         v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
       }
     };
-  }
+}
 
 function Plane(grid) {
   this.vectors = [];
