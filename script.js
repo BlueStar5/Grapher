@@ -491,7 +491,7 @@ function Vector(x, y, id) {
 
     var parents = this.parents;
     if (this.constraints.fixed) {
-      vector = new Vector(0, 0);
+      return;
     }
     called.push(this);
     this.shift(vector);
@@ -530,7 +530,6 @@ function Vector(x, y, id) {
           }
           else {
             if (!called.includes(c)) {
-
               p.transformations.filter(t => t.id === ui.transformations).forEach(t => {
                 if (t.name === "translate") {
                   c.shift(t.args.vector);
@@ -547,33 +546,13 @@ function Vector(x, y, id) {
             if (!called.includes(c)) {
               c.shift(vector);
               c.setTransformation("translate", {vector: vector}, ui.transformations);
-              //called.push(c);
             }
           }
         });
       });
-      var children = parents.map(p => p.children).reduce((flat, row) => flat.concat(row), []);
-      /*children.forEach(c => {
-      if (!called.includes(c)) {
-      var v = vector;
-      if (c.constraints.fixed) {
-      v = new Vector(0, 0);
+      var children = flattenArray(parents.map(p => p.children));
+      parents = flattenArray(children.map(c => c.parents));
     }
-    else {
-    if (c.parents.any(p => p.p.filter(point => point.constraints.fixed).length > 1))
-    {
-    v =
-  }
-}
-console.log("Vector " + c.id + " " + c.toString() + " was translated to " + c.add(v).toString());
-c.setTransformation("translate", v, ui.transformations);
-c.shift(v);
-called.push(c);
-}
-});*/
-
-parents = children.map(c => c.parents).reduce((flat, row) => flat.concat(row), []);
-}
 }
   this.shift = function(vector) {
     console.log("Vector " + this.id + " " + this.toString() + " has been shifted by " + vector.toString() + " to " + this.add(vector).toString() + ".");
@@ -1540,4 +1519,7 @@ function canvasToGrid(vector) {
   v = vector.add(cam.min).multiply(cam.perPixel / 100);
   v.y *= -1;
   return v;
+}
+function flattenArray(arr) {
+  return arr.reduce((flat, row) => flat.concat(row), [])
 }
