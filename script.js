@@ -20,6 +20,7 @@ var settings = {
 
   tolerance: 1e-10,
   displayPlaces: 3,
+  detailedConsole: false,
 
   gridBackground: '#002244',
   gridLineColors: {
@@ -311,15 +312,19 @@ var commands = {
       var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
       if (settings.selecting && settings.selected) {
-        vector = plane.getVector(settings.selected);
-        if (!vector) {
-          vector = plane.getLine(settings.selected).pointClosestTo(canvasToGrid(new Vector(mouse.downX, mouse.downY)));
+        var vectorSelected = plane.getVector(settings.selected);
+        if (vectorSelected) {
+          vector = vectorSelected;
+        }
+        else {
+          var lineSelected = plane.getLine(settings.selected);
+          vector = lineSelected.pointClosestTo(vector);
           var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
           if (existingVector) {
             vector = existingVector;
           }
           else {
-            plane.getLine(settings.selected).addVector(vector);
+            vector.fixTo(lineSelected);
           }
         }
       }
@@ -349,6 +354,19 @@ var commands = {
     }
   }
 };
+var log = {
+  transformations: [],
+  log: function(transformation) {
+    this.transformations.push(transformation);
+    console.log(transformation.toString());
+  },
+  plane: null,
+  broadcast: function(transformation) {
+    this.log(transformation);
+    this.plane.getObjects().filter(obj => !(transformation.exclude && transformation.exclude.includes(obj)))
+    .forEach(obj => obj.receive(transformation));
+  }
+};
 ui.init();
 
 var ctx = ui.canvas.getContext('2d');
@@ -360,7 +378,7 @@ var mouse = new Mouse();
 var grid = new Grid();
 var plane = new Plane(grid)
 var cam = new Camera(-ui.canvasCSSWidth() / 2, -ui.canvasCSSHeight() / 2, ui.canvasCSSWidth() / 2, ui.canvasCSSHeight() / 2, plane);
-
+log.plane = plane;
 // update canvas when resized
 new ResizeSensor(ui.canvasWrapper, function() {
   // store old and new dimensions to calculate delta
@@ -384,6 +402,82 @@ new ResizeSensor(ui.canvasWrapper, function() {
 plane.addLine(new LineSegment(new Vector(100, 200), new Vector(700, 260)));
 plane.addVector(new Vector(150, 400));
 cam.update();
+
+function Translation(object, vector, args) {
+  this.name = 'translation';
+  this.object = object;
+  this.vector = vector;
+  if (args) {
+    this.exclude = args.exclude;
+    this.preImage = args.preImage;
+    this.image = args.image;
+  }
+  this.getPreImage = function() {
+    return this.preImage || (this.image ? this.image.translated(vector.negative()) : null) || this.object.translated(vector.negative());
+  }
+  this.getImage = function() {
+    return this.image || (this.preImage ? this.preImage.translated(vector) : null) || this.object;
+  }
+  this.toString = function() {
+    if (settings.detailedConsole) {
+      return `${object.nameString()} ${this.getPreImage().detailsString()} has been translated ${vector.detailsString()} to ${this.getImage().detailsString()}.`;
+    }
+    else {
+      return `${object.nameString()} has been translated.`;
+    }
+  }
+}
+function Rotation(object, center, radians, args) {
+  this.name = 'rotation';
+  this.object = object;
+  this.center = center;
+  this.radians = radians;
+  if (args) {
+    this.exclude = args.exclude;
+    this.preImage = args.preImage;
+    this.image = args.image;
+  }
+  this.getPreImage = function() {
+    return this.preImage || (this.image ? this.image.rotated(center, -radians) : null) || this.object.rotated(center, -radians);
+  }
+  this.getImage = function() {
+    return this.image || (this.preImage ? this.preImage.rotated(center, radians) : null) || this.object;
+  }
+  this.toString = function() {
+    if (settings.detailedConsole) {
+      return `${object.nameString()} ${this.getPreImage().detailsString()} has been rotated ${radians} radians about ${center.detailsString()} to ${this.getImage().detailsString()}.`;
+    }
+    else {
+      return `${object.nameString()} has been rotated.`
+    }
+  }
+}
+function Extension(object, endpoint, distance, args) {
+  this.name = 'extension';
+  this.object = object;
+  this.endpoint = endpoint;
+  this.distance = distance;
+  if (args) {
+    this.exclude = args.exclude;
+    this.preImage = args.preImage;
+    this.image = args.image;
+  }
+  this.getPreImage = function() {
+    return this.preImage || (this.image ? this.image.extended(this.endpoint, -this.distance) : null) || this.object.extended(this.endpoint, -this.distance);
+  }
+  this.getImage = function() {
+    return this.image || (this.preImage ? this.preImage.extended(this.endpoint, this.distance) : null) || this.object;
+  }
+  this.toString = function() {
+    if (settings.detailedConsole) {
+      return `${object.nameString()} ${this.getPreImage().detailsString()} has been extended through point ${this.endpoint.detailsString()} to ${this.getImage().detailsString()}.`
+    }
+    else {
+      return `${object.nameString()} has been extended.`
+    }
+  }
+}
+
 function Circle(x, y, radius, id) {
   this.id = id;
   this.x = x;
@@ -412,7 +506,7 @@ function Vector(x, y, id) {
 
   this.constraints = {
     fixedTo: []
-  };
+  }
   this.fixTo = function(obj) {
     this.constraints.fixedTo.push(obj);
   }
@@ -495,15 +589,41 @@ function Vector(x, y, id) {
   }
   this.translate = function(vector) {
     var image = this.add(vector);
-    var fixedTo = this.constraints.fixedTo;
+    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.constraints.fixedTo.includes(this));
     if (fixedTo.length) {
-      this.setPosition(this.getClosest(
+      image = this.getClosest(
         fixedTo.map(obj => obj.pointClosestTo(image)) // get the closest point of each object to this
         .filter(point => fixedTo.every(obj => obj.onLine(point))) // keep only the points that are on all objects
-      ));
+      );
     }
-    else {
-      this.setPosition(image);
+    var displacement = image.subtract(this);
+    this.setPosition(image);
+    log.broadcast(new Translation(this, displacement));
+  }
+  this.receive = function(transformation) {
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object)) {
+      if (transformation.name === 'translation') {
+      }
+      if (transformation.name === 'rotation') {
+        var rotation = transformation;
+        this.rotate(rotation.center, rotation.radians);
+      }
+      if (transformation.name === 'extension') {
+        var extension = transformation;
+        var line = extension.object;
+        var fixedTo = line.constraints.fixedTo;
+        if (!fixedTo.includes(this)) {
+          var endpoint = extension.endpoint;
+          var otherEndpoint = line.endpoints.filter(p => p !== endpoint)[0];
+          console.log(endpoint.toString());
+          console.log(otherEndpoint.toString());
+          // if endpoint passed this point, then move this point back to endpoint
+          if (endpoint.distanceTo(otherEndpoint) < this.distanceTo(otherEndpoint)) {
+            this.translate(endpoint.subtract(this));
+          }
+        }
+      }
     }
   }
   this.shift = function(vector) {
@@ -565,13 +685,19 @@ function Vector(x, y, id) {
     }
   }
   this.rotate = function(center, radians) {
+    this.setPosition(this.rotated(center, radians));
+    log.broadcast(new Rotation(this, center, radians));
+  }
+  this.rotated = function(center, radians) {
     var relativeVector = this.subtract(center);
     var angleSum = relativeVector.angle() + radians;
     if (!isNaN(angleSum)) {
-      var image = new Vector(Math.cos(angleSum),   Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
-      console.log("Vector " + this.id + " " + this.toString() + " has been rotated by " + radians + " radians about " + center.toString() + " to " + image.toString() + ".");
-      this.setPosition(image);
+      return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
     }
+    return this;
+  }
+  this.translated = function(vector) {
+    return this.add(vector);
   }
   this.add = function(vector) {
     return new Vector(this.x + vector.x, this.y + vector.y);
@@ -606,8 +732,19 @@ function Vector(x, y, id) {
   this.clone = function(id) {
     return new Vector(this.x, this.y, id);
   }
+  this.nameString = function() {
+    if (this.id) {
+      return 'Vector ' + this.id;
+    }
+    else {
+      return 'Vector';
+    }
+  }
+  this.detailsString = function() {
+    return `\(${roundFromZero(this.x, 2)}, ${roundFromZero(this.y, 2)}\)`
+  }
   this.toString = function() {
-    return `\(${roundFromZero(this.x, 2)}, ${roundFromZero(this.y, 2)}\)`;
+    return `${this.nameString()} ${this.detailsString()}`;
   }
 }
 function LineSegment(p1, p2) {
@@ -651,6 +788,8 @@ function LineSegment(p1, p2) {
     }
     this.endpoints.push(vector);
     this.children.push(vector);
+    this.fixTo(vector);
+    vector.fixTo(this);
   }
   this.hasEndpoint = function(vector) {
     return this.endpoints.includes(vector);
@@ -675,7 +814,62 @@ function LineSegment(p1, p2) {
   this.midpoint = function() {
     return this.p1.add(this.p2).divide(2);
   }
-  this.setSlope = function(slope, anchor, xSign, ySign, callers) {
+  this.receive = function(transformation) {
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object)) {
+      if (transformation.name === 'translation') {
+        var translation = transformation;
+
+        // p1 isn't the translated vector; p2 is the translated vector before translation
+        var preImagePoint = translation.getPreImage();
+        var otherEndpoint = [this.p1, this.p2].filter(p => p !== translation.object)[0].clone();
+        var preImageMidpoint = new LineSegment(otherEndpoint, preImagePoint).midpoint();
+
+        // the rotation center will be the reflection of the preimage translated point in the midpoint
+        var vectorToMidpoint = preImagePoint.subtract(preImageMidpoint);
+        var center = preImageMidpoint.subtract(vectorToMidpoint);
+
+        var oldAngle = preImagePoint.angle(otherEndpoint);
+        var newAngle = translation.getImage().angle(otherEndpoint);
+        var angle = newAngle - oldAngle;
+
+        var rotation = new Rotation(this, center, angle, {exclude: [translation.object], preImage: this});
+        var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
+        var endpoint = translation.getPreImage().rotated(center, angle);
+        var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
+
+        log.broadcast(rotation);
+        log.broadcast(extension);
+      }
+    }
+  }
+  this.translated = function(vector) {
+    return new LineSegment(this.p1.translated(vector), this.p2.translated(vector));
+  }
+  this.extended = function(endpoint, distance) {
+    if (arguments.length === 0) {
+      return new Line(this.p1, this.p2);
+    }
+    var otherEndpoint = [this.p1, this.p2].filter(p => p !== endpoint)[0];
+    var slopeVector = endpoint.subtract(otherEndpoint).normalize();
+    var translation = slopeVector.multiply(distance);
+
+    var p1, p2;
+    if (this.p1 === endpoint) {
+      p1 = endpoint.add(translation);
+      p2 = otherEndpoint.clone();
+    }
+    else {
+      p1 = otherEndpoint.clone();
+      p2 = endpoint.add(translation);
+    }
+    return new LineSegment(p1, p2);
+  }
+  this.rotated = function(center, radians) {
+    var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
+    return new LineSegment(endpoints[0], endpoints[1]);
+  }
+  this.setSlope = function(slope, anchor, xSign, ySign) {
     //console.log(slope);
     anchor = anchor || new Vector(0, this.yInt());
     this.shift(anchor.negative());
@@ -700,16 +894,6 @@ function LineSegment(p1, p2) {
       }
     });
     this.children.filter(c => !c.isEndpointOf(this)).forEach(c => {
-      /*
-      a^2+b^2=x^2+y^2
-      a=kb
-      (kb)^2+b^2 = x^2+y^2
-      b^2=(x^2+y^2)/(k^2+1)
-      */
-      /*if (Math.abs(slope) === Infinity) {
-      var x = 0;
-      var y = p.subtract(anchor)
-    }*/
     if (Math.abs(slope) === Infinity) {
       x = 0;
       y = c.magnitude() * ySign;
@@ -718,8 +902,6 @@ function LineSegment(p1, p2) {
       x = Math.sqrt((c.x * c.x + c.y * c.y) / (slope * slope + 1)) * xSign;
       y = Math.abs(slope * x) * ySign;
     }
-
-    //console.log(x + " " + y + " " + slope + " " + xSign + " " + ySign);
     if (callers.includes(c)) {
       c.setPosition(new Vector(x, y));
     }
@@ -727,10 +909,8 @@ function LineSegment(p1, p2) {
       callers.push(this);
       c.translate(new Vector(x, y).subtract(c), callers);
     }
-    //p.setPosition(new Vector(x, y));
-
   });
-  this.shift(anchor);
+    this.shift(anchor);
   }
   this.dilate = function(factor, center, callers) {
     center = center || new Vector(0, 0);
@@ -759,9 +939,6 @@ function LineSegment(p1, p2) {
     this.shift(center);
 
   }
-  this.extended = function() {
-    return new Line(this.p1, this.p2);
-  }
   this.addVector = function(vector) {
     this.children.push(vector);
     vector.addParent(this);
@@ -784,25 +961,8 @@ function LineSegment(p1, p2) {
     }
   }
   this.shift = function(vector, callers) {
-    callers = callers || [];
-
-    // save the initial position of each point, else the final point of a closed figure will be shifted twice
-    var initialPos = [];
-    this.children.forEach(c => {
-      initialPos[c.id] = c.clone();
-    });
-
-    this.children.forEach(c => {
-      if (callers.includes(c)) {
-        c.setPosition(initialPos[c.id].add(vector));
-      }
-      else {
-        if (!callers.includes(this)) {
-          callers.push(this);
-        }
-        c.setPosition(initialPos[c.id].add(vector), callers);
-      }
-    });
+    this.p1.shift(vector);
+    this.p2.shift(vector);
   }
   this.translate = function(vector) {
     var called = [];
@@ -926,8 +1086,19 @@ function LineSegment(p1, p2) {
   this.length = function() {
     return p2.subtract(p1).magnitude();
   }
+  this.nameString = function() {
+    if (this.id) {
+      return 'Line Segment ' + this.id;
+    }
+    else {
+      return 'Line Segment';
+    }
+  }
+  this.detailsString = function() {
+    return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
+  }
   this.toString = function() {
-    return `\(\(${this.p1.x}, ${this.p1.y}\), \(${this.p2.x}, ${this.p2.y}\)\)`
+    return `${this.nameString()} ${this.detailsString()}`
   }
 }
 function Line(p1, p2) {
@@ -1284,7 +1455,6 @@ function Camera(minX, minY, maxX, maxY, plane) {
       }
     };
 }
-
 function Plane(grid) {
   this.vectors = [];
   this.lines = [];
@@ -1292,6 +1462,9 @@ function Plane(grid) {
   this.intersections = [];
   this.grid = grid;
 
+  this.getObjects = function() {
+    return this.vectors.concat(this.lines);
+  }
   this.updateLine = function(line) {
   }
 
