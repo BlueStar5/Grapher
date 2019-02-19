@@ -20,7 +20,7 @@ var settings = {
 
   tolerance: 1e-10,
   displayPlaces: 3,
-  detailedConsole: false,
+  detailedConsole: true,
 
   gridBackground: '#002244',
   gridLineColors: {
@@ -183,6 +183,9 @@ var ui = {
   wireUpCheckboxes: function() {
     for (var i = 0; i < this.checkboxes.length; i++) {
       var checkbox = this.checkboxes[i];
+      // set the checkbox to reflect default setting values
+      checkbox.checked = settings[checkbox.getAttribute('value')];
+
       checkbox.addEventListener('change', e => {
         if (e.target.checked) {
           settings[e.target.getAttribute('value')] = true;
