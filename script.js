@@ -480,6 +480,31 @@ function Extension(object, endpoint, distance, args) {
     }
   }
 }
+function Dilation(object, center, factor, args) {
+  this.name = 'dilation';
+  this.object = object;
+  this.center = center;
+  this.factor = factor;
+  if (args) {
+    this.exclude = args.exclude;
+    this.preImage = args.preImage;
+    this.image = args.image;
+  }
+  this.getPreImage = function() {
+    return this.preImage || (this.image ? this.image.dilated(this.center, 1 / this.factor) : null) || this.object.dilated(this.center, 1 / this.factor);
+  }
+  this.getImage = function() {
+    return this.image || (this.preImage ? this.preImage.dilated(this.center, this.factor) : null) || this.object;
+  }
+  this.toString = function() {
+    if (settings.detailedConsole) {
+      return `${object.nameString()} ${this.getPreImage().detailsString()} has been dilated ${this.factor}x about ${this.center.detailsString()} to ${this.getImage().detailsString()}.`
+    }
+    else {
+      return `${object.nameString()} has been dilated.`
+    }
+  }
+}
 
 function Circle(x, y, radius, id) {
   this.id = id;
@@ -603,6 +628,13 @@ function Vector(x, y, id) {
     this.setPosition(image);
     log.broadcast(new Translation(this, displacement));
   }
+  this.dilate = function(center, factor) {
+    this.setPosition(this.dilated(center, factor));
+    log.broadcast(new Dilation(this, center, factor));
+  }
+  this.dilated = function(center, factor) {
+    return this.subtract(center).multiply(factor).add(center);
+  }
   this.receive = function(transformation) {
     var fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
@@ -626,6 +658,10 @@ function Vector(x, y, id) {
             this.translate(endpoint.subtract(this));
           }
         }
+      }
+      if (transformation.name === 'dilation') {
+        var dilation = transformation;
+        this.dilate(transformation.center, transformation.factor);
       }
     }
   }
@@ -840,9 +876,11 @@ function LineSegment(p1, p2) {
         var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
         var endpoint = translation.getPreImage().rotated(center, angle);
         var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
+        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object]});
 
         log.broadcast(rotation);
-        log.broadcast(extension);
+        log.broadcast(dilation);
+        //log.broadcast(extension);
       }
     }
   }
@@ -914,6 +952,9 @@ function LineSegment(p1, p2) {
     }
   });
     this.shift(anchor);
+  }
+  this.dilated = function(center, factor) {
+    return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
   }
   this.dilate = function(factor, center, callers) {
     center = center || new Vector(0, 0);
