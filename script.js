@@ -215,7 +215,7 @@ var commands = {
     if (settings.mode === 'line') {
       // store vector temporarily
       var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-      if (settings.selecting && settings.selected) {
+      if (settings.selecting && settings.selected !== null) {
         var vectorSelected = plane.getVector(settings.selected);
         if (vectorSelected) {
           vector = vectorSelected;
@@ -283,7 +283,7 @@ var commands = {
     if (settings.mode === 'vector') {
       var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
-      if (settings.selecting && settings.selected) {
+      if (settings.selecting && settings.selected !== null) {
         var vectorSelected = plane.getVector(settings.selected);
         if (vectorSelected) {
           vector = vectorSelected;
@@ -334,7 +334,7 @@ var commands = {
       // store vector temporarily
       var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
-      if (settings.selecting && settings.selected) {
+      if (settings.selecting && settings.selected !== null) {
         var vectorSelected = plane.getVector(settings.selected);
         if (vectorSelected) {
           vector = vectorSelected;
