@@ -214,13 +214,29 @@ var commands = {
   line: mouse => {
     if (settings.mode === 'line') {
       // store vector temporarily
-      var selectedV = plane.getVector(settings.selected);
-      var vector = settings.selecting && selectedV ? selectedV : canvasToGrid(new Vector(mouse.downX, mouse.downY));
+      var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+      if (settings.selecting && settings.selected) {
+        var vectorSelected = plane.getVector(settings.selected);
+        if (vectorSelected) {
+          vector = vectorSelected;
+        }
+        else {
+          var lineSelected = plane.getLine(settings.selected);
+          vector = lineSelected.pointClosestTo(vector);
+          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+          if (existingVector) {
+            vector = existingVector;
+          }
+          else {
+            vector.fixTo(lineSelected);
+          }
+        }
+      }
       plane.addTempVector(vector);
 
-      // create segment when both vectors are available
+      // create line when both vectors are available
       if (plane.tempVectors.length === 2) {
-        // if the two vectors are the same, create the vector instead
+        // if the two vectors are equal, create the vector instead
         if (plane.tempVectors[1].subtract(plane.tempVectors[0]).magnitude() === 0) {
           plane.addVector(plane.tempVectors[0]);
           ui.addObject("Vector ", plane.tempVectors[0]);
@@ -228,6 +244,7 @@ var commands = {
         else {
           var line = new Line(plane.tempVectors[0], plane.tempVectors[1]);
 
+          plane.tempVectors.forEach(v => plane.addVector(v));
           plane.addLine(line);
           ui.addObject("Line ", line);
         }
@@ -340,6 +357,7 @@ var commands = {
       if (plane.tempVectors.length === 2) {
         var seg = new LineSegment(plane.tempVectors[0], plane.tempVectors[1]);
 
+        plane.tempVectors.forEach(v => plane.addVector(v));
         plane.addLine(seg);
 
         ui.addObject("Line Segment ", seg);
@@ -653,10 +671,11 @@ function Vector(x, y, id) {
     var image = this.add(vector);
     var fixedTo = this.constraints.fixedTo.filter(obj => !obj.constraints.fixedTo.includes(this));
     if (fixedTo.length) {
-      image = this.getClosest(
-        fixedTo.map(obj => obj.pointClosestTo(image)) // get the closest point of each object to this
-        .filter(point => fixedTo.every(obj => obj.onLine(point))) // keep only the points that are on all objects
-      );
+      // get the closest point of each object to this
+      var closestPossiblePoints = fixedTo.map(obj => obj.pointClosestTo(image))
+        // keep only the points that are on all objects
+        .filter(point => fixedTo.every(obj => obj.onLine(point)));
+      image = closestPossiblePoints.length ? this.getClosest(closestPossiblePoints) : this;
     }
     var displacement = image.subtract(this);
     this.setPosition(image);
@@ -1112,28 +1131,32 @@ function Line(p1, p2) {
     this.p1 = p1;
     this.p2 = p2;
   }
-  this.children = [];
-  this.children.push(this.p1);
-  this.children.push(this.p2);
-
   this.setId = function(id) {
     this.id = id;
-    this.children.filter(c => !c.hasParent(this)).forEach(c => c.addParent(this));
   }
-
-  this.addVector = function(vector) {
-    this.children.push(vector);
-    vector.addParent(this);
+  this.constraints = {
+    fixedTo: []
+  };
+  this.fixTo = function(obj) {
+    this.constraints.fixedTo.push(obj);
   }
+  this.p1.fixTo(this);
+  this.p2.fixTo(this);
 
-  this.dilate = function(factor) {
+  this.receive = function() {
+
+  }
+  /*this.dilate = function(factor) {
     this.p1 = this.p1.multiply(factor);
     this.p2 = this.p2.multiply(factor);
   }
   this.translate = function(vector) {
     return new LineSegment(this.p1.add(vector), this.p2.add(vector));
-  }
+  }*/
 
+  this.midpoint = function() {
+    return this.p1.add(this.p2).divide(2);
+  }
   this.getX = function(y) {
     if (Math.abs(this.getSlope()) === Infinity) {
       return this.p1.x;
@@ -1153,7 +1176,7 @@ function Line(p1, p2) {
     return this.getSlope() * (x - this.p1.x) + this.p1.y;
   }
   this.onLine = function(vector) {
-    return this.getX(vector.y) === vector.x && this.getY(vector.x) === vector.y;
+    return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
   }
   this.perpThrough = function(vector) {
     return new Line({slope: -1 / this.getSlope(), p: vector});
@@ -1487,7 +1510,6 @@ function Plane(grid) {
     return this.lines.filter(l => l.id === id)[0] || null;
   }
   this.addLine = function(line) {
-    line.endpoints.forEach(p => this.addVector(p));
     line.setId(plane.numObjects());
     this.lines.push(line);
   }
