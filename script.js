@@ -73,14 +73,14 @@ var ui = {
 
     document.getElementById('line-heading').innerHTML = line.length() === Infinity ? 'Line' : 'Line Segment';
 
-    line.children.forEach(c => {
+    /*line.children.forEach(c => {
       if (!document.getElementsByClassName(c.id).length) {
         var li = document.createElement('li');
         li.appendChild(this.getVectorTemplate(c));
         this.objectChildren.appendChild(li);
       }
       this.updateVectorProps(c);
-    });
+    });*/
   },
   getVectorTemplate: function(vector) {
     var textH2 = document.createTextNode('Vector');
@@ -203,8 +203,7 @@ var ui = {
 
     this.wireUpButtons();
     this.wireUpCheckboxes();
-  },
-  transformations: 0
+  }
 };
 var commands = {
   pan: mouse => {
@@ -309,7 +308,6 @@ var commands = {
             console.log("|\n|---Line " + l.id + " being translated---\n|");
           }
           l.translate(translation);
-          ui.transformations++;
         }
       }
     }
@@ -411,8 +409,6 @@ new ResizeSensor(ui.canvasWrapper, function() {
   cam.update();
 });
 
-plane.addLine(new LineSegment(new Vector(100, 200), new Vector(700, 260)));
-plane.addVector(new Vector(150, 400));
 cam.update();
 
 function Translation(object, vector, args) {
@@ -593,7 +589,6 @@ function Vector(x, y, id) {
   this.id = id;
   this.x = x;
   this.y = y;
-  this.parents = [];
 
   this.endpointOf = [];
 
@@ -604,43 +599,17 @@ function Vector(x, y, id) {
     this.constraints.fixedTo.push(obj);
   }
 
-  this.transformations = [];
-
   this.setAsEndpoint = function(line) {
     this.endpointOf.push(line);
   }
-
   this.isEndpointOf = function(line) {
     return this.endpointOf.includes(line);
   }
+
   this.setId = function(id) {
     this.id = id;
   }
-  this.setTransformation = function(name, args, id) {
-    var existing = this.transformations.filter(t => t.id === id);
-    var newTransformation = {
-      name: name,
-      args: args,
-      id: id
-    }
 
-    if (existing.length) {
-      this.transformations[this.transformations.indexOf(existing[0])] = newTransformation;
-    }
-    else {
-      this.transformations.push(newTransformation);
-    }
-  }
-
-  this.addParent = function(p) {
-    this.parents.push(p);
-  }
-  this.removeParent = function(p) {
-    this.parents.splice(this.parents.indexOf(p), 1);
-  }
-  this.hasParent = function(p) {
-    return this.parents.includes(p);
-  }
   this.draw = function(offset, color, dilation, radius) {
     offset = offset || new Vector(0, 0);
     ctx.fillStyle = color;
@@ -751,10 +720,6 @@ function Vector(x, y, id) {
         }
       }
     }
-  }
-  this.shift = function(vector) {
-    console.log("Vector " + this.id + " " + this.toString() + " has been shifted by " + vector.toString() + " to " + this.add(vector).toString() + ".");
-    this.setPosition(this.add(vector));
   }
   this.getClosest = function(vectors) {
     return vectors.reduce((closest, cur) => this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
@@ -886,62 +851,32 @@ function LineSegment(p1, p2) {
   this.id = undefined;
   this.p1 = p1;
   this.p2 = p2;
-  this.children = [];
+
   this.endpoints = [];
-  this.intersections = {};
+  this.setEndpoint = function(vector) {
+    if (this.id) {
+      vector.setAsEndpoint(this);
+      vector.fixTo(this);
+    }
+    this.endpoints.push(vector);
+    this.fixTo(vector);
+  }
+  this.hasEndpoint = function(vector) {
+    return this.endpoints.includes(vector);
+  }
+
   this.constraints = {
     fixedTo: []
   };
   this.fixTo = function(obj) {
     this.constraints.fixedTo.push(obj);
   }
-  this.transformations = [
-    /*
-    {
-    transformation: "translate",
-    vector: vector
-  },
-  */
-];
-  this.setTransformation = function(name, args, id) {
-    var existing = this.transformations.filter(t => t.id === id);
-    var newTransformation = {
-      name: name,
-      args: args,
-      id: id
-    }
-    if (existing.length) {
-      this.transformations[this.transformations.indexOf(existing[0])] = newTransformation;
-    }
-    else {
-      this.transformations.push(newTransformation);
-    }
-  }
-  this.setEndpoint = function(vector) {
-    if (this.id) {
-      vector.setAsEndpoint(this);
-    }
-    this.endpoints.push(vector);
-    this.children.push(vector);
-    this.fixTo(vector);
-    vector.fixTo(this);
-  }
-  this.hasEndpoint = function(vector) {
-    return this.endpoints.includes(vector);
-  }
+
   this.setEndpoint(p1);
   this.setEndpoint(p2);
-  this.setIntersection = function(vector, line) {
-    if (!this.intersections.includes(vector)) {
-      this.intersections.vector = [];
-    }
-    this.intersections.vector.push(line);
-  }
+
   this.setId = function(id) {
     this.id = id;
-    // once this becomes an IDed object, let its children add it as a parent
-    this.children.filter(c => !c.hasParent(this)).forEach(c => c.addParent(this));
-    this.endpoints.filter(c => !c.isEndpointOf(this)).forEach(c => c.setAsEndpoint(this));
   }
   this.yInt = function() {
     return this.extended().getY(0);
@@ -1008,78 +943,8 @@ function LineSegment(p1, p2) {
     var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
     return new LineSegment(endpoints[0], endpoints[1]);
   }
-  this.setSlope = function(slope, anchor, xSign, ySign) {
-    //console.log(slope);
-    anchor = anchor || new Vector(0, this.yInt());
-    this.shift(anchor.negative());
-    var x;
-    var y;
-    this.endpoints.filter(p => !p.equals(new Vector(0, 0))).forEach(p => {
-      if (Math.abs(slope) === Infinity) {
-        x = 0;
-        y = p.magnitude() * ySign;
-      }
-      else {
-        x = Math.sqrt((p.x * p.x + p.y * p.y) / (slope * slope + 1)) * xSign;
-        y = Math.abs(slope * x) * ySign;
-      }
-      if (callers.includes(p)) {
-        console.log("Vector " + p.id + " " + p.toString() + " was rotated to " + new Vector(x, y).toString());
-        p.setPosition(new Vector(x, y));
-      }
-      else {
-        callers.push(this);
-        p.translate(new Vector(x, y).subtract(p), callers);
-      }
-    });
-    this.children.filter(c => !c.isEndpointOf(this)).forEach(c => {
-    if (Math.abs(slope) === Infinity) {
-      x = 0;
-      y = c.magnitude() * ySign;
-    }
-    else {
-      x = Math.sqrt((c.x * c.x + c.y * c.y) / (slope * slope + 1)) * xSign;
-      y = Math.abs(slope * x) * ySign;
-    }
-    if (callers.includes(c)) {
-      c.setPosition(new Vector(x, y));
-    }
-    else {
-      callers.push(this);
-      c.translate(new Vector(x, y).subtract(c), callers);
-    }
-  });
-    this.shift(anchor);
-  }
   this.dilated = function(center, factor) {
     return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
-  }
-  this.dilate = function(factor, center, callers) {
-    center = center || new Vector(0, 0);
-    this.shift(center.negative());
-    this.endpoints.filter(p => !p.equals(new Vector(0, 0))).forEach(p => {
-      if (callers.includes(p)) {
-        console.log("Vector " + p.id + " " + p.toString() + " was dilated to " + p.multiply(factor).toString());
-        p.setPosition(p.multiply(factor));
-      }
-      else {
-        callers.push(this);
-        p.translate(p.multiply(factor).subtract(p), callers);
-      }
-
-    });
-    this.children.filter(c => !c.isEndpointOf(this)).forEach(c => {
-      if (callers.includes(c)) {
-        p.setPosition(c.multiply(factor));
-      }
-      else {
-        callers.push(this);
-        c.translate(c.multiply(factor).subtract(c), callers);
-      }
-
-    });
-    this.shift(center);
-
   }
   this.addVector = function(vector) {
     this.children.push(vector);
@@ -1101,10 +966,6 @@ function LineSegment(p1, p2) {
     if (settings.selected === this.id) {
       ui.updateLineProps(this);
     }
-  }
-  this.shift = function(vector, callers) {
-    this.p1.shift(vector);
-    this.p2.shift(vector);
   }
   this.translate = function(vector) {
     var called = [];
@@ -1218,11 +1079,6 @@ function LineSegment(p1, p2) {
         }
       }
     }
-    // check for common explicit points
-    // TODO
-    if (vector && this.children.some(c => c.equals(vector))) {
-      return this.children.filter(c => c.equals(vector))[0];
-    }
     return vector;
   }
   this.length = function() {
@@ -1333,12 +1189,6 @@ function Line(p1, p2) {
     var x;
     // check for intersection
     if (this.getSlope() != line.getSlope()) {
-      // check for common explicit points
-      this.children.forEach(p1 => {
-        if (line.children.some(p2 => p2.equals(p1))) {
-          return p1;
-        }
-      });
       // handle vertical lines
       if (Math.abs(this.getSlope()) == Infinity) {
         x = this.p1.x;
@@ -1483,16 +1333,18 @@ function Camera(minX, minY, maxX, maxY, plane) {
       }
       // store points of new LineSegment that will be drawn
       var points = [];
-      // iterate over each point of the line
+      // iterate over each endpoint of the line
       [l.p1, l.p2].forEach(p => {
-        // if the line extends beyond the grid, use an intersection with the grid instead
+        // if the line extends beyond the camera, use an intersection with the camera instead
         if (!(p.x >= this.plane.grid.minX && p.x <= this.plane.grid.maxX && p.y >= this.plane.grid.minY && p.y <= this.plane.grid.maxY) || l.length() === Infinity) {
           // find intersections of the line and the grid (4 max)
-          p = [l.getIntersection(boundaryX1),
-            l.getIntersection(boundaryX2), l.getIntersection(boundaryY1), l.getIntersection(boundaryY2)]
+          p = [l.getIntersection(boundaryX1), l.getIntersection(boundaryX2),
+            l.getIntersection(boundaryY1), l.getIntersection(boundaryY2)]
             // ensure intersection exists and isn't already a point of the new LineSegment to be drawn
+            // TODO
             .filter(i => i && !(points.length && points[0].x === i.x && points[0].y === i.y))
             // choose the intersection closest to the original point
+            // TODO
             .reduce((min, cur) => (!min || cur.subtract(p).magnitude() < min.subtract(p).magnitude()) ? cur : min, undefined);
           }
           else {
@@ -1544,7 +1396,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
   this.dilate = function(factor) {
     this.min = this.min.multiply(factor);
     this.max = this.max.multiply(factor);
-  }
+  };
 
   this.scaleContent = function(change, translation) {
     this.dilation *= change;
@@ -1570,7 +1422,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
   this.translate = function(translation) {
     this.min = this.min.add(translation);
     this.max = this.max.add(translation);
-  }
+  };
 
   this.update = function() {
     this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
@@ -1581,12 +1433,12 @@ function Camera(minX, minY, maxX, maxY, plane) {
     this.drawLines(this.plane.grid.lines, settings.gridLineColors);
     this.drawLines(this.plane.lines);
     this.drawVectors(this.plane.getVectors());
-  }
+  };
   this.drawVectors = function(vectors) {
     vectors.forEach(v => {
       this.drawVector(v);
     });
-  }
+  };
   this.drawVector = function(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
         var radius = settings.pointRadius;
@@ -1595,7 +1447,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
         }
         v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
       }
-    };
+  };
 }
 function Plane(grid) {
   this.vectors = [];
@@ -1635,17 +1487,7 @@ function Plane(grid) {
     return this.lines.filter(l => l.id === id)[0] || null;
   }
   this.addLine = function(line) {
-    /*this.lines.forEach(l => {
-    var inter = l.getIntersection(line);
-    if (l.getIntersection(line) !== undefined) {
-    console.log('yas');
-    line.addVector(inter);
-    l.addVector(inter);
-    console.log(l.p);
-    ui.addObject('', l);
-    }
-    });*/
-    line.children.forEach(c => this.addVector(c));
+    line.endpoints.forEach(p => this.addVector(p));
     line.setId(plane.numObjects());
     this.lines.push(line);
   }
