@@ -21,6 +21,7 @@ var settings = {
   tolerance: 1e-10,
   displayPlaces: 3,
   detailedConsole: true,
+  logToConsole: true,
 
   gridBackground: '#002244',
   gridLineColors: {
@@ -295,14 +296,18 @@ var commands = {
 
       var v = plane.getVector(settings.selected);
       if (v) {
-        console.log("|\n|---Vector " + v.id + " being translated---\n|");
+        if (settings.logToConsole) {
+          console.log("|\n|---Vector " + v.id + " being translated---\n|");
+        }
         v.translate(translation);
-        ui.transformations++;
+        log.objectCommands++; // TODO
       }
       else {
         var l = plane.getLine(settings.selected);
         if (l) {
-          console.log("|\n|---Line " + l.id + " being translated---\n|");
+          if (settings.logToConsole) {
+            console.log("|\n|---Line " + l.id + " being translated---\n|");
+          }
           l.translate(translation);
           ui.transformations++;
         }
@@ -361,14 +366,18 @@ var log = {
   transformations: [],
   log: function(transformation) {
     this.transformations.push(transformation);
-    console.log(transformation.toString());
+    if (settings.logToConsole) {
+      console.log(transformation.toString());
+    }
   },
   plane: null,
   broadcast: function(transformation) {
+    transformation.id = this.objectCommands;
     this.log(transformation);
     this.plane.getObjects().filter(obj => !(transformation.exclude && transformation.exclude.includes(obj)))
     .forEach(obj => obj.receive(transformation));
-  }
+  },
+  objectCommands: 0
 };
 ui.init();
 
@@ -407,6 +416,7 @@ plane.addVector(new Vector(150, 400));
 cam.update();
 
 function Translation(object, vector, args) {
+  this.id = 0;
   this.name = 'translation';
   this.object = object;
   this.vector = vector;
@@ -429,8 +439,22 @@ function Translation(object, vector, args) {
       return `${object.nameString()} has been translated.`;
     }
   }
+  /*this.receivers = [];
+  this.addReceiver = function(object) {
+    this.receivers.push(object);
+  }*/
+  this.equals = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.vector.equals(transformation.vector);
+  }
+  this.similarTo = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name;
+  }
+  /*this.receivedBy = function(object) {
+    return this.receivers.includes(object);
+  }*/
 }
 function Rotation(object, center, radians, args) {
+  this.id = 0;
   this.name = 'rotation';
   this.object = object;
   this.center = center;
@@ -454,8 +478,22 @@ function Rotation(object, center, radians, args) {
       return `${object.nameString()} has been rotated.`
     }
   }
+  // this.receivers = [];
+  // this.addReceiver = function(object) {
+  //   this.receivers.push(object);
+  // }
+  this.equals = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.radians === transformation.radians;
+  }
+  this.similarTo = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
+  }
+  // this.receivedBy = function(object) {
+  //   return this.receivers.includes(object);
+  // }
 }
 function Extension(object, endpoint, distance, args) {
+  this.id = 0;
   this.name = 'extension';
   this.object = object;
   this.endpoint = endpoint;
@@ -479,8 +517,22 @@ function Extension(object, endpoint, distance, args) {
       return `${object.nameString()} has been extended.`
     }
   }
+  // this.receivers = [];
+  // this.addReceiver = function(object) {
+  //   this.receivers.push(object);
+  // }
+  this.equals = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.endpoint.equals(transformation.endpoint) && this.distance === transformation.distance;
+  }
+  this.similarTo = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.endpoint.equals(transformation.endpoint);
+  }
+  // this.receivedBy = function(object) {
+  //   return this.receivers.includes(object);
+  // }
 }
 function Dilation(object, center, factor, args) {
+  this.id = 0;
   this.name = 'dilation';
   this.object = object;
   this.center = center;
@@ -504,6 +556,19 @@ function Dilation(object, center, factor, args) {
       return `${object.nameString()} has been dilated.`
     }
   }
+  // this.receivers = [];
+  // this.addReceiver = function(object) {
+  //   this.receivers.push(object);
+  // }
+  this.equals = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.factor === transformation.factor;
+  }
+  this.similarTo = function(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
+  }
+  // this.receivedBy = function(object) {
+  //   return this.receivers.includes(object);
+  // }
 }
 
 function Circle(x, y, radius, id) {
@@ -615,7 +680,7 @@ function Vector(x, y, id) {
     }
     return angle;
   }
-  this.translate = function(vector) {
+  this.translate = function(vector, translation) {
     var image = this.add(vector);
     var fixedTo = this.constraints.fixedTo.filter(obj => !obj.constraints.fixedTo.includes(this));
     if (fixedTo.length) {
@@ -626,23 +691,43 @@ function Vector(x, y, id) {
     }
     var displacement = image.subtract(this);
     this.setPosition(image);
-    log.broadcast(new Translation(this, displacement));
+    if (translation) {
+      var exclude = [translation.object];
+      if (translation.args && translation.args.exclude) {
+        exclude = exclude.concat(translation.args.exclude);
+      }
+      log.broadcast(new Translation(this, displacement, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Translation(this, displacement));
+    }
   }
-  this.dilate = function(center, factor) {
+  this.dilate = function(center, factor, dilation) {
     this.setPosition(this.dilated(center, factor));
-    log.broadcast(new Dilation(this, center, factor));
+    if (dilation) {
+      var exclude = [dilation.object];
+      if (dilation.args && dilation.args.exclude) {
+        exclude = exclude.concat(dilation.args.exclude);
+      }
+      log.broadcast(new Dilation(this, center, factor, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Dilation(this, center, factor));
+    }
   }
   this.dilated = function(center, factor) {
     return this.subtract(center).multiply(factor).add(center);
   }
   this.receive = function(transformation) {
     var fixedTo = this.constraints.fixedTo;
-    if (fixedTo.includes(transformation.object)) {
+    if (fixedTo.includes(transformation.object) /*&& !this.received.some(t => t.similarTo(transformation))*/) {
       if (transformation.name === 'translation') {
       }
       if (transformation.name === 'rotation') {
         var rotation = transformation;
-        this.rotate(rotation.center, rotation.radians);
+        if (!rotation.center.equals(this)) {
+          this.rotate(rotation.center, rotation.radians, rotation);
+        }
       }
       if (transformation.name === 'extension') {
         var extension = transformation;
@@ -661,7 +746,9 @@ function Vector(x, y, id) {
       }
       if (transformation.name === 'dilation') {
         var dilation = transformation;
-        this.dilate(transformation.center, transformation.factor);
+        if (!dilation.center.equals(this)) {
+          this.dilate(transformation.center, transformation.factor, dilation);
+        }
       }
     }
   }
@@ -723,9 +810,18 @@ function Vector(x, y, id) {
       this.y = vector.y;
     }
   }
-  this.rotate = function(center, radians) {
+  this.rotate = function(center, radians, rotation) {
     this.setPosition(this.rotated(center, radians));
-    log.broadcast(new Rotation(this, center, radians));
+    if (rotation) {
+      var exclude = [rotation.object];
+      if (rotation.args && rotation.args.exclude) {
+        exclude = exclude.concat(rotation.args.exclude);
+      }
+      log.broadcast(new Rotation(this, center, radians, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Rotation(this, center, radians));
+    }
   }
   this.rotated = function(center, radians) {
     var relativeVector = this.subtract(center);
@@ -856,7 +952,6 @@ function LineSegment(p1, p2) {
   this.receive = function(transformation) {
     var fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
-      if (transformation.name === 'translation') {
         var translation = transformation;
 
         // p1 isn't the translated vector; p2 is the translated vector before translation
@@ -872,16 +967,19 @@ function LineSegment(p1, p2) {
         var newAngle = translation.getImage().angle(otherEndpoint);
         var angle = newAngle - oldAngle;
 
-        var rotation = new Rotation(this, center, angle, {exclude: [translation.object], preImage: this});
+        var existingExclusions = [];
+        if (transformation.args && transformation.args.exclude) {
+          existingExclusions = transformation.args.exclude;
+        }
+        var rotation = new Rotation(this, center, angle, {exclude: [translation.object].concat(existingExclusions), preImage: this});
         var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
         var endpoint = translation.getPreImage().rotated(center, angle);
-        var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
-        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object]});
+        //var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
+        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object].concat(existingExclusions), preImage: this});
 
         log.broadcast(rotation);
         log.broadcast(dilation);
         //log.broadcast(extension);
-      }
     }
   }
   this.translated = function(vector) {
