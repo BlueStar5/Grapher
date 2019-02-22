@@ -436,8 +436,8 @@ function Translation(object, vector, args) {
   this.vector = vector;
   if (args) {
     this.exclude = args.exclude;
-    this.preImage = args.preImage;
-    this.image = args.image;
+    this.preImage = args.preImage ? args.preImage.clone() : undefined;
+    this.image = args.image ? args.image.clone() : undefined;
   }
   this.getPreImage = function() {
     return this.preImage || (this.image ? this.image.translated(vector.negative()) : null) || this.object.translated(vector.negative());
@@ -475,8 +475,8 @@ function Rotation(object, center, radians, args) {
   this.radians = radians;
   if (args) {
     this.exclude = args.exclude;
-    this.preImage = args.preImage;
-    this.image = args.image;
+    this.preImage = args.preImage ? args.preImage.clone() : undefined;
+    this.image = args.image ? args.image.clone() : undefined;
   }
   this.getPreImage = function() {
     return this.preImage || (this.image ? this.image.rotated(center, -radians) : null) || this.object.rotated(center, -radians);
@@ -514,8 +514,8 @@ function Extension(object, endpoint, distance, args) {
   this.distance = distance;
   if (args) {
     this.exclude = args.exclude;
-    this.preImage = args.preImage;
-    this.image = args.image;
+    this.preImage = args.preImage ? args.preImage.clone() : undefined;
+    this.image = args.image ? args.image.clone() : undefined;
   }
   this.getPreImage = function() {
     return this.preImage || (this.image ? this.image.extended(this.endpoint, -this.distance) : null) || this.object.extended(this.endpoint, -this.distance);
@@ -553,8 +553,8 @@ function Dilation(object, center, factor, args) {
   this.factor = factor;
   if (args) {
     this.exclude = args.exclude;
-    this.preImage = args.preImage;
-    this.image = args.image;
+    this.preImage = args.preImage ? args.preImage.clone() : undefined;
+    this.image = args.image ? args.image.clone() : undefined;
   }
   this.getPreImage = function() {
     return this.preImage || (this.image ? this.image.dilated(this.center, 1 / this.factor) : null) || this.object.dilated(this.center, 1 / this.factor);
@@ -612,21 +612,24 @@ function Vector(x, y, id) {
 
   this.constraints = {
     fixedTo: []
-  }
+  };
   this.fixTo = function(obj) {
     this.constraints.fixedTo.push(obj);
-  }
+  };
+  this.fixedTo = function(obj) {
+    return this.constraints.fixedTo.includes(obj);
+  };
 
   this.setAsEndpoint = function(line) {
     this.endpointOf.push(line);
-  }
+  };
   this.isEndpointOf = function(line) {
     return this.endpointOf.includes(line);
-  }
+  };
 
   this.setId = function(id) {
     this.id = id;
-  }
+  };
 
   this.draw = function(offset, color, dilation, radius) {
     offset = offset || new Vector(0, 0);
@@ -641,7 +644,7 @@ function Vector(x, y, id) {
     ctx.stroke();
     ctx.translate(-.5, -.5);*/
 
-  }
+  };
   this.angle = function(center) {
     var x;
     var y;
@@ -666,16 +669,23 @@ function Vector(x, y, id) {
       angle = Math.PI + refAngle;
     }
     return angle;
-  }
+  };
   this.translate = function(vector, translation) {
     var image = this.add(vector);
-    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.constraints.fixedTo.includes(this));
-
+    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
+    console.log('lala');
     if (translation) {
-      fixedTo = fixedTo.filter(obj => obj !== translation.object).push(translation.getImage());
+      fixedTo = fixedTo.filter(obj => obj !== translation.object);
+      console.log('heyo');
+      if (!translation.object.fixedTo(this)) {
+        fixedTo.push(translation.getImage());
+      }
     }
     if (fixedTo.length) {
       var intersection = fixedTo[0].getIntersection(fixedTo.slice(1));
+      console.log(fixedTo);
+      console.log(intersection.toString());
+      console.log(image);
       image = intersection ? image.getClosest([intersection]) : this;
       // get the closest point of each object to this
       /*var closestPossiblePoints = fixedTo.map(obj => obj.pointClosestTo(image))
@@ -758,27 +768,6 @@ function Vector(x, y, id) {
     return vector.subtract(this).magnitude();
   }
   this.update = function() {
-    console.log('yosa');
-    if (this.parents.length === 1) {
-      var l = this.parents[0];
-      if (!l.onLine(this)) {
-        this.setPosition(l.pointClosestTo(this));
-      }
-    }
-    // TODO work for more than 2
-    if (this.parents.length > 1) {
-      var inter = this.parents[0].getIntersection(this.parents[1]);
-      // if the lines still intersect but this is not at the intersection
-      if (inter && !this.equals(inter)) {
-        this.setPosition(inter);
-      }
-      // if the lines no longer intersect
-      if (!inter) {
-        var closestLine = this.parents.reduce((closest, l) => l.distanceTo(this) < closest.distanceTo(this) ? l : closest);
-        this.setPosition(closestLine.pointClosestTo(this));
-      }
-      this.parents.filter(p => !p.onLine(this)).forEach(p => p.removePoint(this));
-    }
     if (settings.selected === this.id) {
       ui.updateVectorProps(this);
     }
@@ -863,7 +852,7 @@ function Vector(x, y, id) {
     return new Vector(this.x, this.y, id);
   }
   this.nameString = function() {
-    if (this.id) {
+    if (this.id !== undefined) {
       return 'Vector ' + this.id;
     }
     else {
@@ -887,30 +876,33 @@ function LineSegment(p1, p2) {
     this.endpoints.push(vector);
     this.fixTo(vector);
     vector.fixTo(this);
-  }
+  };
   this.hasEndpoint = function(vector) {
     return this.endpoints.includes(vector);
-  }
+  };
 
   this.constraints = {
     fixedTo: []
   };
   this.fixTo = function(obj) {
     this.constraints.fixedTo.push(obj);
-  }
+  };
+  this.fixedTo = function(obj) {
+    return this.constraints.fixedTo.includes(obj);
+  };
 
   this.setEndpoint(p1);
   this.setEndpoint(p2);
 
   this.setId = function(id) {
     this.id = id;
-  }
+  };
   this.yInt = function() {
     return this.extended().getY(0);
-  }
+  };
   this.midpoint = function() {
     return this.p1.add(this.p2).divide(2);
-  }
+  };
   this.receive = function(transformation) {
     var fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
@@ -943,10 +935,10 @@ function LineSegment(p1, p2) {
         log.broadcast(dilation);
         //log.broadcast(extension);
     }
-  }
+  };
   this.translated = function(vector) {
     return new LineSegment(this.p1.translated(vector), this.p2.translated(vector));
-  }
+  };
   this.extended = function(endpoint, distance) {
     if (arguments.length === 0) {
       return new Line(this.p1.clone(), this.p2.clone());
@@ -965,50 +957,49 @@ function LineSegment(p1, p2) {
       p2 = endpoint.add(translation);
     }
     return new LineSegment(p1, p2);
-  }
+  };
   this.rotated = function(center, radians) {
     var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
     return new LineSegment(endpoints[0], endpoints[1]);
-  }
+  };
   this.dilated = function(center, factor) {
     return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
-  }
+  };
   this.addVector = function(vector) {
     this.children.push(vector);
     vector.addParent(this);
     this.update();
-  }
+  };
   this.removePoint = function(vector) {
     this.children.splice(this.children.indexOf(vector), 1);
     vector.removeParent(this);
-  }
+  };
   this.onLine = function(vector) {
     return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
-  }
+  };
   this.update = function() {
     this.children.forEach(c => {
       c.update();
     });
-    //plane.updateLine(this);
     if (settings.selected === this.id) {
       ui.updateLineProps(this);
     }
-  }
+  };
   this.translate = function(vector) {
     log.broadcast(new Translation(this, vector, {preImage: this}));
-  }
+  };
   this.getX = function(y) {
     if (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y) {
       return (y - this.p1.y) / this.getSlope() + this.p1.x;
     }
     return undefined;
-  }
+  };
   this.getY = function(x) {
     if (x >= this.p1.x && x <= this.p2.x || x <= this.p1.x && x >= this.p2.x) {
       return this.getSlope() * (x - this.p1.x) + this.p1.y;
     }
     return undefined;
-  }
+  };
   this.perpThrough = function(vector) {
     var perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
 
@@ -1016,7 +1007,7 @@ function LineSegment(p1, p2) {
       return perp;
     }
     return undefined;
-  }
+  };
   this.distanceTo = function(vector) {
     var perp = this.perpThrough(vector);
     if (perp) {
@@ -1025,7 +1016,7 @@ function LineSegment(p1, p2) {
     else {
       return Math.min(vector.subtract(this.p1).magnitude(), vector.subtract(this.p2).magnitude());
     }
-  }
+  };
   this.pointClosestTo = function(vector) {
     var perp = this.perpThrough(vector);
     if (perp) {
@@ -1034,7 +1025,7 @@ function LineSegment(p1, p2) {
     else {
       return vector.subtract(this.p2).magnitude() < vector.subtract(this.p1).magnitude() ? this.p2 : this.p1;
     }
-  }
+  };
   this.draw = function(offset, color, dilation, thickness) {
     ctx.lineWidth = thickness;
 
@@ -1046,10 +1037,10 @@ function LineSegment(p1, p2) {
     ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
     ctx.stroke();
     ctx.translate(-.5, -.5);
-  }
+  };
   this.getSlope = function() {
     return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
-  }
+  };
   this.getIntersection = function(line) {
     /* m(x - x1) + y = n(x - x2) + b
     * mx - mx1 + y = nx - nx2 + b
@@ -1061,61 +1052,70 @@ function LineSegment(p1, p2) {
       lines = line.concat([this]);
       line = lines[0];
     }
-    var vector;
-
-    var x;
-    if (this.getSlope() != line.getSlope()) {
-      if (Math.abs(this.getSlope()) == Infinity) {
+    var intersection;
+    if (this.getSlope() !== line.getSlope()) {
+      var x;
+      if (Math.abs(this.getSlope()) === Infinity) {
         x = this.p1.x;
         var y = line.getY(x);
 
         if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          vector = new Vector(x, y);
+          intersection = new Vector(x, y);
         }
       }
-      else if (Math.abs(line.getSlope()) == Infinity) {
+      else if (Math.abs(line.getSlope()) === Infinity) {
         x = line.p1.x;
         var y = this.getY(x);
 
-        if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          vector = new Vector(x, y);
+        if (y !== undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
+          intersection = new Vector(x, y);
         }
       }
       else {
         x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
         if (this.getY(x) !== undefined && line.getY(x) !== undefined) {
-          vector = new Vector(x, this.getY(x));
+          intersection = new Vector(x, this.getY(x));
         }
       }
     }
+    // if the line(segment)s are (on) the same line, their intersection is a line(segment)
     else if (this.equals(line)) {
-      return line;
+      if (lines.length > 1) {
+        lines.shift();
+        return line.getIntersection(lines);
+      }
+      else {
+        return line;
+      }
     }
-    if (lines && lines.some(l => !l.onLine(vector))) {
+    if (intersection && lines.some(l => !l.onLine(intersection))) {
       return undefined;
     }
-    return vector;
-  }
+    return intersection;
+  };
   this.equals = function(line) {
     return this.p1.equals(line.p1) && this.p2.equals(line.p2);
-  }
+  };
+  this.clone = function() {
+    return new LineSegment(this.p1.clone(), this.p2.clone());
+  };
   this.length = function() {
     return p2.subtract(p1).magnitude();
-  }
+  };
   this.nameString = function() {
-    if (this.id) {
+    if (this.id !== undefined) {
       return 'Line Segment ' + this.id;
     }
     else {
       return 'Line Segment';
     }
-  }
+  };
   this.detailsString = function() {
     return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
-  }
+  };
   this.toString = function() {
     return `${this.nameString()} ${this.detailsString()}`
-  }
+  };
 }
 function Line(p1, p2) {
   this.id = undefined;
@@ -1134,13 +1134,18 @@ function Line(p1, p2) {
     this.id = id;
   }
   this.constraints = {
-    fixedTo: []
+    fixedTo: [],
   };
   this.fixTo = function(obj) {
     this.constraints.fixedTo.push(obj);
   }
+  this.fixedTo = function(obj) {
+    return this.constraints.fixedTo.includes(obj);
+  };
   this.p1.fixTo(this);
   this.p2.fixTo(this);
+  this.fixTo(this.p1);
+  this.fixTo(this.p2);
 
   this.receive = function() {
 
@@ -1218,49 +1223,59 @@ function Line(p1, p2) {
       lines = line.concat([this]);
       line = lines[0];
     }
-    var vector;
-
+    var intersection;
     var x;
+    // check for intersection
     if (this.getSlope() != line.getSlope()) {
+      // handle vertical lines
       if (Math.abs(this.getSlope()) == Infinity) {
         x = this.p1.x;
         var y = line.getY(x);
 
-        if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          vector = new Vector(x, y);
+        if (y != undefined) {
+          intersection = new Vector(x, y);
         }
       }
       else if (Math.abs(line.getSlope()) == Infinity) {
         x = line.p1.x;
         var y = this.getY(x);
 
-        if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          vector = new Vector(x, y);
+        if (y >= line.p1.y && y <= line.p2.y || y <= line.p1.y && y >= line.p2.y) {
+          intersection = new Vector(x, y);
         }
       }
       else {
         x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
-        if (this.getY(x) !== undefined && line.getY(x) !== undefined) {
-          vector = new Vector(x, this.getY(x));
+        if (this.getY(x) != undefined && line.getY(x) != undefined) {
+          intersection = new Vector(x, this.getY(x));
         }
       }
     }
     else if (this.equals(line)) {
-      return line;
+      if (lines.length > 1) {
+        lines.shift();
+        return line.getIntersection(lines);
+      }
+      else {
+        return line;
+      }
     }
-    if (lines && lines.some(l => !l.onLine(vector))) {
+    if (intersection && lines.some(l => !l.onLine(intersection))){
       return undefined;
     }
-    return vector;
+    return intersection;
   }
   this.equals = function(line) {
-    return this.p1.equals(line.p1) && this.p2.equals(line.p2);
+    return this.p1.equals(line.p1) && this.p2.equals(line.p2) || this.p1.equals(line.p2) && this.p2.equals(line.p1);
+  }
+  this.clone = function() {
+    return new Line(this.p1.clone(), this.p2.clone());
   }
   this.length = function() {
     return Infinity;
   }
   this.nameString = function() {
-    if (this.id) {
+    if (this.id !== undefined) {
       return 'Line ' + this.id;
     }
     else {
@@ -1510,8 +1525,6 @@ function Plane(grid) {
 
   this.getObjects = function() {
     return this.vectors.concat(this.lines);
-  }
-  this.updateLine = function(line) {
   }
 
   this.numObjects = function() {
