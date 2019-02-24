@@ -206,32 +206,38 @@ var ui = {
   }
 };
 var commands = {
-  pan: mouse => {
+  getVectorFromMouse: function(mouse) {
+    var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+
+    if (settings.selecting && settings.selected !== null) {
+      var vectorSelected = plane.getVector(settings.selected);
+      if (vectorSelected) {
+        vector = vectorSelected;
+      }
+      else {
+        var lineSelected = plane.getLine(settings.selected);
+        vector = lineSelected.pointClosestTo(vector);
+
+        var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+        if (existingVector) {
+          vector = existingVector;
+        }
+        else {
+          vector.fixTo(lineSelected);
+        }
+      }
+    }
+    return vector;
+  },
+  pan: function(mouse) {
       if (mouse.down && settings.mode === 'pan') {
         cam.translate(new Vector(-mouse.deltaX, -mouse.deltaY));
       }
   },
-  line: mouse => {
+  line: function(mouse) {
     if (settings.mode === 'line') {
       // store vector temporarily
-      var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-      if (settings.selecting && settings.selected !== null) {
-        var vectorSelected = plane.getVector(settings.selected);
-        if (vectorSelected) {
-          vector = vectorSelected;
-        }
-        else {
-          var lineSelected = plane.getLine(settings.selected);
-          vector = lineSelected.pointClosestTo(vector);
-          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
-          if (existingVector) {
-            vector = existingVector;
-          }
-          else {
-            vector.fixTo(lineSelected);
-          }
-        }
-      }
+      var vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
 
       // create line when both vectors are available
@@ -253,7 +259,7 @@ var commands = {
       }
     }
   },
-  select: mouse => {
+  select: function(mouse) {
     if (settings.selecting) {
       // clear previous selection
       settings.selected = null;
@@ -279,34 +285,14 @@ var commands = {
       }
     }
   },
-  vector: mouse => {
+  vector: function(mouse) {
     if (settings.mode === 'vector') {
-      var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-
-      if (settings.selecting && settings.selected !== null) {
-        var vectorSelected = plane.getVector(settings.selected);
-        if (vectorSelected) {
-          vector = vectorSelected;
-        }
-        else {
-          var lineSelected = plane.getLine(settings.selected);
-          vector = lineSelected.pointClosestTo(vector);
-          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
-          if (existingVector) {
-            vector = existingVector;
-          }
-          else {
-            vector.fixTo(lineSelected);
-          }
-        }
-      }
-
+      var vector = commands.getVectorFromMouse(mouse);
       plane.addVector(vector);
-
       ui.addObject("Vector ", vector);
     }
   },
-  move: mouse => {
+  move: function(mouse) {
     if (settings.mode === 'move' && mouse.down) {
       var translation = new Vector(mouse.deltaX, -mouse.deltaY);
 
@@ -329,28 +315,10 @@ var commands = {
       }
     }
   },
-  segment: mouse => {
+  segment: function(mouse) {
     if (settings.mode === 'segment') {
       // store vector temporarily
-      var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-
-      if (settings.selecting && settings.selected !== null) {
-        var vectorSelected = plane.getVector(settings.selected);
-        if (vectorSelected) {
-          vector = vectorSelected;
-        }
-        else {
-          var lineSelected = plane.getLine(settings.selected);
-          vector = lineSelected.pointClosestTo(vector);
-          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
-          if (existingVector) {
-            vector = existingVector;
-          }
-          else {
-            vector.fixTo(lineSelected);
-          }
-        }
-      }
+      var vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
 
       // create segment when both vectors are available
@@ -367,7 +335,7 @@ var commands = {
       }
     }
   },
-  fix: mouse => {
+  fix: function(mouse) {
     console.log("HOYA");
     if (settings.mode === 'fix')
     {
@@ -673,25 +641,15 @@ function Vector(x, y, id) {
   this.translate = function(vector, translation) {
     var image = this.add(vector);
     var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
-    console.log('lala');
     if (translation) {
       fixedTo = fixedTo.filter(obj => obj !== translation.object);
-      console.log('heyo');
       if (!translation.object.fixedTo(this)) {
         fixedTo.push(translation.getImage());
       }
     }
     if (fixedTo.length) {
       var intersection = fixedTo[0].getIntersection(fixedTo.slice(1));
-      console.log(fixedTo);
-      console.log(intersection.toString());
-      console.log(image);
       image = intersection ? image.getClosest([intersection]) : this;
-      // get the closest point of each object to this
-      /*var closestPossiblePoints = fixedTo.map(obj => obj.pointClosestTo(image))
-        // keep only the points that are on all objects
-        .filter(point => fixedTo.every(obj => obj.onLine(point)));
-      image = closestPossiblePoints.length ? this.getClosest(closestPossiblePoints) : this;*/
     }
     var displacement = image.subtract(this);
     this.setPosition(image);
