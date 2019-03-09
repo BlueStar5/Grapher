@@ -282,6 +282,12 @@ var commands = {
           settings.selected = line.id;
           ui.updateLineProps(line);
         }
+        else {
+          var arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
+          if (arc) {
+            settings.selected = arc.id;
+          }
+        }
       }
     }
   },
@@ -372,7 +378,7 @@ var keyboard = new Keyboard();
 var mouse = new Mouse();
 
 var grid = new Grid();
-var plane = new Plane(grid)
+var plane = new Plane(grid);
 var cam = new Camera(-ui.canvasCSSWidth() / 2, -ui.canvasCSSHeight() / 2, ui.canvasCSSWidth() / 2, ui.canvasCSSHeight() / 2, plane);
 log.plane = plane;
 // update canvas when resized
@@ -394,6 +400,10 @@ new ResizeSensor(ui.canvasWrapper, function() {
   cam.resize(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY);
   cam.update();
 });
+
+plane.addVector(new Vector(50, 0));
+plane.addVector(new Vector(0, 0));
+plane.addVector(new Vector(0, 50));
 
 cam.update();
 
@@ -553,26 +563,72 @@ function Dilation(object, center, factor, args) {
   // }
 }
 
-function Circle(x, y, radius, id) {
-  this.id = id;
-  this.x = x;
-  this.y = y;
+function Arc(angle, radius) {
+  this.id = undefined;
+  this.angle = angle;
+  this.center = angle.vertex;
   this.radius = radius;
-  this.draw = function(offset, color, dilation, thickness) {
-    ctx.lineWidth = thickness;
-    ctx.strokeStyle = color;
 
-    //                ctx.translate(.5, .5);
+  this.distanceTo = function(vector) {
+    if (this.angle.inside(vector)) {
+      return Math.abs(vector.distanceTo(this.center) - this.radius);
+    }
+    else {
+      return Math.min(vector.distanceTo(this.angle.p1), vector.distanceTo(this.angle.p2));
+    }
+  }
+
+  this.constraints = {
+    fixedTo: []
+  };
+  this.fixTo = function(obj) {
+    this.constraints.fixedTo.push(obj);
+  };
+  this.fixedTo = function(obj) {
+    return this.constraints.fixedTo.includes(obj);
+  };
+  this.setId = function(id) {
+    this.id = id;
+  };
+  this.draw = function(offset, dilation, color, thickness) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+
+    // ctx.translate(.5, .5);
     offset = offset || new Vector(0, 0);
 
     ctx.beginPath();
-    ctx.arc(roundFromZero(this.x * dilation + offset.x), roundFromZero(-this.y * dilation + offset.y), this.radius, 0, 2 * Math.PI, true);
+    ctx.arc(roundFromZero(this.center.x * dilation + offset.x), roundFromZero(-this.center.y * dilation + offset.y),
+      this.radius, 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
     ctx.stroke();
-    //ctx.translate(-.5, -.5);
+    // ctx.translate(-.5, -.5);
   }
 }
-function Vector(x, y, id) {
-  this.id = id;
+function Angle(p1, vertex, p2) {
+  this.p1 = p1;
+  this.vertex = vertex;
+  this.p2 = p2;
+
+  this.getStartAngle = function() {
+    return this.p1.angle(this.vertex);
+  }
+  this.getEndAngle = function() {
+    return this.p2.angle(this.vertex);
+  }
+  this.toCCW = function(angle) {
+    return (Math.PI * 2 + angle) % (Math.PI * 2);
+  }
+  this.inside = function(vector) {
+    var vectorAngle = vector.rotated(this.vertex, -this.getStartAngle()).angle(this.vertex);
+    return vectorAngle > 0 && vectorAngle < this.getMeasure();
+  }
+  this.getMeasure = function() {
+    return this.toCCW(this.p2.angle(this.vertex) - this.p1.angle(this.vertex));
+  }
+}
+
+function Vector(x, y) {
+  this.id = undefined;
   this.x = x;
   this.y = y;
 
@@ -807,7 +863,9 @@ function Vector(x, y, id) {
     return equal(this.x, vector.x) && equal(this.y, vector.y);
   }
   this.clone = function(id) {
-    return new Vector(this.x, this.y, id);
+    var clone = new Vector(this.x, this.y);
+    clone.setId(id);
+    return clone;
   }
   this.nameString = function() {
     if (this.id !== undefined) {
@@ -1371,15 +1429,14 @@ function Camera(minX, minY, maxX, maxY, plane) {
             // choose the intersection closest to the original point
             // TODO
             .reduce((min, cur) => (!min || cur.subtract(p).magnitude() < min.subtract(p).magnitude()) ? cur : min, undefined);
-          }
-          else {
-            p = p.clone();
-          }
-          // add the point to the list of valid points
-          points.push(p);
-
-        });
-        if (points[0] && points[1]) {
+        }
+        else {
+          p = p.clone();
+        }
+        // add the point to the list of valid points
+        points.push(p);
+      });
+      if (points[0] && points[1]) {
           var thickness = settings.lineThickness;
           if (gridColors) {
             thickness = settings.gridThickness;
@@ -1410,8 +1467,15 @@ function Camera(minX, minY, maxX, maxY, plane) {
             ctx.textBaseline = "alphabetic";
           }
         }
-      });
-    };
+    });
+  };
+  this.drawArcs = function(arcs) {
+    arcs.forEach(a => this.drawArc(a));
+  }
+  this.drawArc = function(arc) {
+    var thickness = (arc.id === settings.selected ? settings.selectedThickness : settings.lineThickness);
+    arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
+  }
 
   this.resize = function(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY) {
     this.min = this.min.add(new Vector(deltaMinX, deltaMinY));
@@ -1455,6 +1519,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
     ctx.fillStyle = settings.gridBackground;
     ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
 
+    this.drawArcs(this.plane.arcs);
     this.drawLines(this.plane.grid.lines, settings.gridLineColors);
     this.drawLines(this.plane.lines);
     this.drawVectors(this.plane.getVectors());
@@ -1477,6 +1542,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
 function Plane(grid) {
   this.vectors = [];
   this.lines = [];
+  this.arcs = [];
   this.tempVectors = [];
   this.intersections = [];
   this.grid = grid;
@@ -1512,6 +1578,10 @@ function Plane(grid) {
   this.addLine = function(line) {
     line.setId(plane.numObjects());
     this.lines.push(line);
+  }
+  this.addArc = function(arc) {
+    arc.setId(plane.numObjects());
+    this.arcs.push(arc);
   }
 }
 
