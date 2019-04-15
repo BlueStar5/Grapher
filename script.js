@@ -215,18 +215,19 @@ var commands = {
         vector = vectorSelected;
       }
       else {
-        var lineSelected = plane.getLine(settings.selected);
-        vector = lineSelected.pointClosestTo(vector);
+        var parentSelected = plane.getParent(settings.selected);
+        vector = parentSelected.pointClosestTo(vector);
 
         var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
         if (existingVector) {
           vector = existingVector;
         }
         else {
-          vector.fixTo(lineSelected);
+          vector.fixTo(parentSelected);
         }
       }
     }
+    console.log(vector);
     return vector;
   },
   pan: function(mouse) {
@@ -337,6 +338,22 @@ var commands = {
         ui.addObject("Line Segment ", seg);
 
         // clear temp vector storage
+        plane.tempVectors.splice(0);
+      }
+    }
+  },
+  arc: function(mouse) {
+    if (settings.mode === 'arc') {
+      var vector = commands.getVectorFromMouse(mouse);
+      plane.addTempVector(vector);
+
+      if (plane.tempVectors.length === 3) {
+        var ang = new Angle(plane.tempVectors[1], plane.tempVectors[0], plane.tempVectors[2]);
+        var arc = new Arc(ang, ang.vertex.distanceTo(ang.p1));
+
+        plane.tempVectors.forEach(v => plane.addVector(v));
+        plane.addArc(arc);
+
         plane.tempVectors.splice(0);
       }
     }
@@ -569,6 +586,10 @@ function Arc(angle, radius) {
   this.center = angle.vertex;
   this.radius = radius;
 
+  this.translated = function(vector) {
+    return new Arc(this.angle.translated(vector), this.radius)
+  }
+
   this.distanceTo = function(vector) {
     if (this.angle.inside(vector)) {
       return Math.abs(vector.distanceTo(this.center) - this.radius);
@@ -577,6 +598,99 @@ function Arc(angle, radius) {
       return Math.min(vector.distanceTo(this.angle.p1), vector.distanceTo(this.angle.p2));
     }
   }
+  this.getArcIntersection = function(arc) {
+    /*
+      Let d be the distance between centers
+      Let P1 and P2 be the centers
+      Let P3 be the midpoint of the intersections
+      Let segments d1 and d2 be P1P3 and P2P3, respectively
+      Let h be the distance from P3 to either intersection
+
+      d1^2 + h^2 = r1^2
+      d2^2 + h^2 = r2^2
+
+      d = d1 + d2
+      d2 = d - d1
+
+      (d - d1)^2 + h^2 = r2^2
+      d^2 - 2d1d + d1^2 + h^2 = r2^2
+      d^2 - 2d1d = r2^2 - r1^2
+      -2d1d = r2^2 - r1^2 - d^2
+      d1 = (d^2 + r1^2 - r2^2) / (2d)
+
+      h^2 = r1^2 - d1^2
+      h = sqrt(r1^2 - d1^2)
+
+      P3 = P1 + d1(P2 - P1) / d
+
+      x4 = x3 +- h(y2 - y1) / d
+      y4 = y3 +- h(x2 - x1) / d
+      */
+    var c1 = this.center;
+    var c2 = arc.center;
+    var d = c2.distanceTo(c1);
+    var d1 = (sqr(d) + sqr(this.radius) - sqr(arc.radius)) / (2 * d);
+
+    var intToIntsMP = Math.sqrt(sqr(this.radius) - sqr(d1));
+    var intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
+
+    var int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+    var int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+
+    if (!int1.equals(int2)) {
+      return [int1, int2];
+    }
+    else {
+      return [int1];
+    }
+  }
+  this.translate = function(vector) {
+    log.broadcast(new Translation(this, vector, {preImage: this}));
+  }
+  this.receive = function() {
+
+  }
+  this.getLineIntersecton = function(line) {
+    var distToCenter = line.distanceTo(this.center);
+    if (lessOrEqual(distToCenter, this.radius)) {
+      var chordMidpoint = line.extended().pointClosestTo(this.center);
+      var halfChordLength = Math.sqrt(this.radius * this.radius - distToCenter * distToCenter);
+
+      var slopeVector = new Vector(1, line.getSlope()).normalize();
+      var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
+      var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
+      console.log(int1);
+      console.log(int2);
+      var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
+      return ints;
+    }
+    else {
+      return undefined;
+    }
+  }
+  this.containsPoint = function(vector) {
+    return this.angle.inside(vector) && equal(vector.distanceTo(this.center), this.radius) ||
+    vector.equals(this.angle.p1) || vector.equals(this.angle.p2);
+  }
+  this.pointClosestTo = function(vector) {
+    if (this.angle.inside(vector)) {
+      var direction = vector.subtract(this.center).normalize();
+      console.log(direction);
+      return this.center.add(direction.multiply(this.radius));
+    }
+    else {
+      console.log('outside');
+      return vector.getClosest(this.angle.p1, this.angle.p2);
+    }
+  }
+  this.receive = function(transformation) {
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object)) {
+      log.broadcast(new Translation(this, vector, {preImage: this}));
+
+    }
+  }
+
 
   this.constraints = {
     fixedTo: []
@@ -624,6 +738,9 @@ function Angle(p1, vertex, p2) {
   }
   this.getMeasure = function() {
     return this.toCCW(this.p2.angle(this.vertex) - this.p1.angle(this.vertex));
+  }
+  this.translated = function() {
+    return new Angle(this.p1.translated(vector), this.vertex.translated(vector, this.p2.translated(vector)));
   }
 }
 
@@ -840,6 +957,12 @@ function Vector(x, y) {
   }
   this.multiply = function(scalar) {
     return new Vector(this.x * scalar, this.y * scalar);
+  }
+  this.normal = function(CW) {
+    if (CW) {
+      return new Vector(this.y, -this.x);
+    }
+    return new Vector(-this.y, this.x);
   }
   this.divide = function(scalar) {
     return new Vector(this.x / scalar, this.y / scalar);
@@ -1287,6 +1410,9 @@ function Line(p1, p2) {
   this.clone = function() {
     return new Line(this.p1.clone(), this.p2.clone());
   }
+  this.extended = function() {
+    return this.clone();
+  }
   this.length = function() {
     return Infinity;
   }
@@ -1548,11 +1674,14 @@ function Plane(grid) {
   this.grid = grid;
 
   this.getObjects = function() {
-    return this.vectors.concat(this.lines);
+    return this.vectors.concat(this.lines).concat(this.arcs);
+  }
+  this.getParents = function() {
+    return this.getObjects().filter(obj => !this.vectors.includes(obj));
   }
 
   this.numObjects = function() {
-    return this.vectors.length + this.lines.length;
+    return this.getObjects().length;
   }
   this.getVectors = function() {
     return this.vectors.concat(this.tempVectors);
@@ -1572,8 +1701,14 @@ function Plane(grid) {
   this.addTempVector = function(vector) {
     this.tempVectors.push(vector);
   }
+  this.getParent = function(id) {
+    return this.getParents().filter(p => p.id === id)[0] || null;
+  }
   this.getLine = function(id) {
     return this.lines.filter(l => l.id === id)[0] || null;
+  }
+  this.getArc = function(id) {
+    return this.arcs.filter(a => a.id === id)[0] || null;
   }
   this.addLine = function(line) {
     line.setId(plane.numObjects());
@@ -1595,6 +1730,7 @@ mouse.onMove(commands.move, 0);
 mouse.onDown(commands.vector, 1);
 mouse.onDown(commands.segment, 1);
 mouse.onDown(commands.line, 1);
+mouse.onDown(commands.arc, 1);
 mouse.onDown(commands.fix, 1);
 mouse.onMove(cam.update.bind(cam), 2);
 mouse.onDown(cam.update.bind(cam), 2);
@@ -1712,6 +1848,9 @@ function Mouse() {
 function equal(x, y) {
   return Math.abs(x - y) <= settings.tolerance;
 }
+function lessOrEqual(x, y) {
+  return x < y || equal(x, y);
+}
 function getSign(n) {
   return Math.abs(n) / n || 0;
 }
@@ -1724,6 +1863,9 @@ function roundFromZero(n, dPlaces) {
   n *= factor;
 
   return (Math.round(Math.abs(n)) * Math.round(Math.abs(n) / n)) / factor || 0;
+}
+function sqr(x) {
+  return x * x;
 }
 function canvasToGrid(vector) {
   v = vector.add(cam.min).multiply(cam.perPixel / 100);
