@@ -623,6 +623,9 @@ function Arc(angle) {
       return Math.min(vector.distanceTo(this.angle.p1), vector.distanceTo(this.angle.p2));
     }
   }
+  this.getLocusIntersection = function(locus) {
+    return locus.getSingleObjIntersection(this);
+  }
   this.getIntersection = function(obj) {
     /* m(x - x1) + y = n(x - x2) + b
     * mx - mx1 + y = nx - nx2 + b
@@ -674,6 +677,18 @@ function Arc(angle) {
     }
     return intersection;
   }
+  this.getIntersection = function(obj) {
+    if (obj.constructor.name === LineSegment.name ||
+      obj.constructor.name === Line.name) {
+        return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Arc.name) {
+      return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Locus.name) {
+      return this.getLocusIntersection(obj);
+    }
+  };
   this.getArcIntersection = function(arc) {
     /*
       Let d be the distance between centers
@@ -760,7 +775,12 @@ function Arc(angle) {
       var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
       var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
       var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
-      return ints;
+      if (ints.length == 1) {
+        return ints[0];
+      }
+      else {
+        return new Locus(ints);
+      }
     }
     else {
       return undefined;
@@ -852,6 +872,9 @@ function Angle(p1, vertex, p2) {
   this.clone = function() {
     return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
   }
+  this.equals = function(angle) {
+    equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
+  }
 }
 function Vector(x, y) {
   this.id = undefined;
@@ -924,8 +947,8 @@ function Vector(x, y) {
     var image = this.add(vector);
     var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
 
-    // if a parent is trying to translate, let this be fixed to its image instead
-    // to prevent a conflict
+    // if a parent is trying to translate, let this act as if fixed to its image
+    // instead to prevent a conflict
     if (translation) {
       fixedTo = fixedTo.filter(obj => obj !== translation.object);
       if (!translation.object.fixedTo(this)) {
@@ -935,8 +958,11 @@ function Vector(x, y) {
     if (fixedTo.length) {
       // try to translate to the closest intersection of all parents
       // if there is no intersection, then this point can't move anywhere
-      var intersection = fixedTo[0].getIntersection(fixedTo.slice(1));
-      image = intersection ? image.getClosest([intersection]) : this;
+      var intersection = new Locus(fixedTo).getSelfIntersection();//fixedTo[0].getIntersection(fixedTo.slice(1));
+      if (intersection) {
+        image = intersection.pointClosestTo(image);
+      }
+      //image = intersection ? image.getClosest(intersection) : this;
     }
     var displacement = image.subtract(this);
     this.setPosition(image);
@@ -1003,8 +1029,11 @@ function Vector(x, y) {
       }
     }
   }
-  this.getClosest = function(vectors) {
-    return vectors.map(v => v.pointClosestTo(this)).reduce((closest, cur) => this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
+  this.getClosest = function(locus) {
+    // map each object to its point closest to this, then reduce that array of
+    // points to the closest one
+    return locus.get().map(v => v.pointClosestTo(this)).reduce((closest, cur) =>
+    this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
   }
   this.pointClosestTo = function(vector) {
     return this;
@@ -1513,7 +1542,7 @@ function Line(p1, p2) {
     * mx - nx = b - nx2 + mx1 - y
     * x = (b - y + mx1 - nx2) / (m - n)
     */
-    var objs = [];
+    /*var objs = [];
     if (Array.isArray(obj)) {
       objs = obj.concat([this]);
       obj = objs[0];
@@ -1558,8 +1587,19 @@ function Line(p1, p2) {
     }
     if (intersection && objs.some(o => !o.containsPoint(intersection))) {
       return undefined;
-    }
-    return intersection;
+    }*/
+
+      if (obj.constructor.name === LineSegment.name ||
+        obj.constructor.name === Line.name) {
+          return this.getLineIntersection(obj);
+      }
+      if (obj.constructor.name === Arc.name) {
+        return this.getLineIntersection(obj);
+      }
+      if (obj.constructor.name === Locus.name) {
+        return this.getLocusIntersection(obj);
+      }
+    //return intersection;
   }
   this.getArcIntersection = function(arc) {
     return arc.getLineIntersection(this);
@@ -1604,6 +1644,9 @@ function Locus(set) {
   this.get = function() {
     return this.set;
   }
+  this.isEmpty = function() {
+    return this.set.length === 0;
+  }
   this.flatten = function(layers) {
     return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
   }
@@ -1643,6 +1686,10 @@ function Locus(set) {
     });
     return new Locus(ints);
   }
+  this.pointClosestTo = function(vector) {
+    return this.set.map(obj => obj.pointClosestTo(vector)).reduce((cur, closest) =>
+    cur.distanceTo(vector) < closest.distanceTo(vector) ? cur : closest);
+  }
   this.getLocusIntersection = function(locus) {
     var intSet = [];
     this.set.forEach(obj => {
@@ -1651,9 +1698,15 @@ function Locus(set) {
     return new Locus(intSet).flatten();
   }
   this.getSelfIntersection = function() {
-    var singeObjInts = new Locus(this.set.slice(1)).getSingleObjIntersection(this.set[0]).get();
+    if (this.set.length === 1) {
+      return this.set[0];
+    }
+    var singleObjInts = new Locus(this.set.slice(1)).getSingleObjIntersection(this.set[0]).get();
     var intsSharedByAll = singleObjInts.filter(int => this.set.every(obj => obj.getIntersection(int)));
-    return new Locus(intsSharedByAll);
+    if (intsSharedByAll.length) {
+      return new Locus(intsSharedByAll);
+    }
+    return null;
   }
 }
 
