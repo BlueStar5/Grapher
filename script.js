@@ -5,8 +5,11 @@ var settings = {
   focusZoom: true,
   rescaleContent: false,
 
-  selected: null,
+  selected: [],
   selectRadius: 5,
+  isSelected: function(id) {
+    return this.selected.includes(id);
+  },
 
   pointRadius: 4,
   selectedRadius: 6,
@@ -209,13 +212,13 @@ var commands = {
   getVectorFromMouse: function(mouse) {
     var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
-    if (settings.selecting && settings.selected !== null) {
-      var vectorSelected = plane.getVector(settings.selected);
+    if (settings.selecting && settings.selected.length) {
+      var vectorSelected = plane.getVector(settings.selected[0]);
       if (vectorSelected) {
         vector = vectorSelected;
       }
       else {
-        var parentSelected = plane.getParent(settings.selected);
+        var parentSelected = plane.getParent(settings.selected[0]);
         vector = parentSelected.pointClosestTo(vector);
 
         var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
@@ -263,7 +266,7 @@ var commands = {
   select: function(mouse) {
     if (settings.selecting) {
       // clear previous selection
-      settings.selected = null;
+      settings.selected = [];
 
       ui.clearProps();
 
@@ -274,19 +277,19 @@ var commands = {
       var vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
 
       if (vector) {
-        settings.selected = vector.id;
+        settings.selected.push(vector.id);
         ui.updateVectorProps(vector);
       }
       else {
         var line = plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
         if (line) {
-          settings.selected = line.id;
+          settings.selected.push(line.id);
           ui.updateLineProps(line);
         }
         else {
           var arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
           if (arc) {
-            settings.selected = arc.id;
+            settings.selected.push(arc.id);
           }
         }
       }
@@ -303,7 +306,7 @@ var commands = {
     if (settings.mode === 'move' && mouse.down) {
       var translation = new Vector(mouse.deltaX, -mouse.deltaY);
 
-      var v = plane.getVector(settings.selected);
+      var v = plane.getVector(settings.selected[0]);
       if (v) {
         if (settings.logToConsole) {
           console.log("|\n|---Vector " + v.id + " being translated---\n|");
@@ -312,7 +315,7 @@ var commands = {
         log.objectCommands++; // TODO
       }
       else {
-        var l = plane.getLine(settings.selected);
+        var l = plane.getLine(settings.selected[0]);
         if (l) {
           if (settings.logToConsole) {
             console.log("|\n|---Line " + l.id + " being translated---\n|");
@@ -367,7 +370,7 @@ var commands = {
     console.log("HOYA");
     if (settings.mode === 'fix')
     {
-      var v = plane.getVector(settings.selected);
+      var v = plane.getVector(settings.selected[0]);
       if (v) {
         v.constraints.fixed = !v.constraints.fixed;
       }
@@ -711,10 +714,10 @@ function Arc(angle) {
     var int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
 
     if (!int1.equals(int2)) {
-      return [int1, int2];
+      return new Locus([int1, int2]);
     }
     else {
-      return [int1];
+      return int1;
     }
   }
   this.translate = function(vector) {
@@ -747,7 +750,7 @@ function Arc(angle) {
     }
 
   }
-  this.getLineIntersecton = function(line) {
+  this.getLineIntersection = function(line) {
     var distToCenter = line.distanceTo(this.center);
     if (lessOrEqual(distToCenter, this.getRadius())) {
       var chordMidpoint = line.extended().pointClosestTo(this.center);
@@ -756,8 +759,6 @@ function Arc(angle) {
       var slopeVector = new Vector(1, line.getSlope()).normalize();
       var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
       var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
-      console.log(int1);
-      console.log(int2);
       var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
       return ints;
     }
@@ -1012,7 +1013,7 @@ function Vector(x, y) {
     return vector.subtract(this).magnitude();
   }
   this.update = function() {
-    if (settings.selected === this.id) {
+    if (settings.isSelected(this.id)) {
       ui.updateVectorProps(this);
     }
     ui.addObject("Line Segment ", this);
@@ -1233,7 +1234,7 @@ function LineSegment(p1, p2) {
     this.children.forEach(c => {
       c.update();
     });
-    if (settings.selected === this.id) {
+    if (settings.isSelected(this.id)) {
       ui.updateLineProps(this);
     }
   };
@@ -1258,19 +1259,12 @@ function LineSegment(p1, p2) {
     if (this.getLineIntersection(perp)) {
       return perp;
     }
-    /*
-    if (!this.getIntersection(perp).isEmpty()) {
-      return perp;
-    }
-    */
     return undefined;
   };
   this.distanceTo = function(vector) {
     var perp = this.perpThrough(vector);
     if (perp) {
       return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
-      // return vector.subtract(this.getIntersection(this.perpThrough(vector)).point()).magnitude();
-
     }
     else {
       return Math.min(vector.subtract(this.p1).magnitude(), vector.subtract(this.p2).magnitude());
@@ -1280,8 +1274,6 @@ function LineSegment(p1, p2) {
     var perp = this.perpThrough(vector);
     if (perp) {
       return this.getLineIntersection(this.perpThrough(vector));
-      //       return this.getIntersection(this.perpThrough(vector)).point();
-
     }
     else {
       return vector.subtract(this.p2).magnitude() < vector.subtract(this.p1).magnitude() ? this.p2 : this.p1;
@@ -1306,6 +1298,11 @@ function LineSegment(p1, p2) {
     return this.onLine(vector);
   }
   this.getLineIntersection = function(line) {
+    /* m(x - x1) + y = n(x - x2) + b
+    * mx - mx1 + y = nx - nx2 + b
+    * mx - nx = b - nx2 + mx1 - y
+    * x = (b - y + mx1 - nx2) / (m - n)
+    */
     if (this.getSlope() !== line.getSlope()) {
       var x;
       if (Math.abs(this.getSlope()) === Infinity) {
@@ -1337,55 +1334,23 @@ function LineSegment(p1, p2) {
     }
   }
   this.getIntersection = function(obj) {
-    /* m(x - x1) + y = n(x - x2) + b
-    * mx - mx1 + y = nx - nx2 + b
-    * mx - nx = b - nx2 + mx1 - y
-    * x = (b - y + mx1 - nx2) / (m - n)
-    */
-    var objs = [];
-    if (Array.isArray(obj)) {
-      objs = obj.concat([this]);
-      obj = objs[0];
-    }
-    var intersection;
     if (obj.constructor.name === LineSegment.name ||
       obj.constructor.name === Line.name) {
-        intersection = this.getLineIntersection(obj);
-        if (!intersection) {
-          return undefined;
-        }
-        // the intersection is a line if the objects are collinear lines
-        if (intersection.constructor.name === LineSegment.name ||
-          intersection.constructor.name === Line.name) {
-            if (objs.length > 1) {
-              objs.shift();
-              return this.getIntersection(objs);
-            }
-            else {
-              return obj.clone();
-            }
-        }
+        return this.getLineIntersection(obj);
     }
-    if (obj.constructor.name === Arc.constructor.name) {
-      intersection = obj.getLineIntersecton(this);
-      if (!intersection) {
-        return undefined;
-      }
+    if (obj.constructor.name === Arc.name) {
+      return this.getLineIntersection(obj);
     }
-    if (Array.isArray(intersection)) {
-      intersection = intersection.filter(int => objs.every(o => o.containsPoint(int)));
-      if (!intersection.length) {
-        return undefined;
-      }
-      else {
-        intersection = intersection[0];
-      }
+    if (obj.constructor.name === Locus.name) {
+      return this.getLocusIntersection(obj);
     }
-    if (intersection && objs.some(o => !o.onLine(intersection))) {
-      return undefined;
-    }
-    return intersection;
   };
+  this.getArcIntersection = function(arc) {
+    return arc.getLineIntersection(this);
+  }
+  this.getLocusIntersection = function(locus) {
+    return locus.getSingleObjIntersection(this);
+  }
   this.equals = function(line) {
     return this.p1.equals(line.p1) && this.p2.equals(line.p2);
   };
@@ -1579,6 +1544,9 @@ function Line(p1, p2) {
         return undefined;
       }
     }
+    if (obj.constructor.name === Locus.name) {
+      intersection = obj.getSingleObjIntersection(this).get();
+    }
     if (Array.isArray(intersection)) {
       intersection = intersection.filter(int => objs.every(o => o.containsPoint(int)));
       if (!intersection.length) {
@@ -1592,6 +1560,9 @@ function Line(p1, p2) {
       return undefined;
     }
     return intersection;
+  }
+  this.getArcIntersection = function(arc) {
+    return arc.getLineIntersection(this);
   }
   this.equals = function(line) {
     return this.p1.equals(line.p1) && this.p2.equals(line.p2) || this.p1.equals(line.p2) && this.p2.equals(line.p1);
@@ -1621,9 +1592,69 @@ function Line(p1, p2) {
   }
 }
 function Locus(set) {
-  this.set = set;
+  this.set = set || [];
 
+  this.removeDupes = function() {
+    this.set = this.set.filter((obj, i) => !this.set.slice(i + 1).some(o =>
+      o.constructor.name === obj.constructor.name && o.equals(obj)));
+  }
 
+  this.removeDupes();
+
+  this.get = function() {
+    return this.set;
+  }
+  this.flatten = function(layers) {
+    return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
+  }
+  this.union = function(locus) {
+    return new Locus(this.set.concat(locus.get()));
+  }
+  this.getIntersection = function(obj) {
+    if (obj.constructor.name === Locus.name) {
+      return this.getLocusIntersection(obj);
+    }
+    else {
+      return this.getSingleObjIntersection(obj);
+    }
+  }
+  this.getSingleObjIntersection = function(obj) {
+    var ints = [];
+    this.set.forEach(setObj => {
+      var intersection;
+      if (setObj.constructor.name === Vector.name) {
+        if (obj.containsPoint(setObj)) {
+          intersection = setObj.clone();
+        }
+      }
+      if (setObj.constructor.name === LineSegment.name ||
+        setObj.constructor.name === Line.name) {
+        intersection = obj.getLineIntersection(setObj);
+      }
+      if (setObj.constructor.name === Arc.name) {
+        intersection = obj.getArcIntersection(setObj);
+      }
+      if (setObj.constructor.name === Locus.name) {
+        intersection = setObj.getSingleObjIntersection(obj);
+      }
+      if (intersection) {
+        ints.push(intersection);
+      }
+    });
+    return new Locus(ints);
+  }
+  this.getLocusIntersection = function(locus) {
+    var intSet = [];
+    this.set.forEach(obj => {
+      intSet.push(locus.getIntersection(obj));
+    });
+    return new Locus(intSet).flatten();
+  }
+  this.getSelfIntersection = function() {
+    var singeObjInts = new Locus(this.set.slice(1)).getSingleObjIntersection(this.set[0]).get();
+    var intsSharedByAll = singleObjInts.filter(int => this.set.every(obj => obj.getIntersection(int)));
+    return new Locus(intsSharedByAll);
+  }
 }
 
 function Grid() {
@@ -1761,7 +1792,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
           if (gridColors) {
             thickness = settings.gridThickness;
           }
-          else if (l.id === settings.selected) {
+          else if (settings.isSelected(l.id)) {
             thickness = settings.selectedThickness;
           }
           // draw the LineSegment of the line that's in the grid
@@ -1793,7 +1824,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
     arcs.forEach(a => this.drawArc(a));
   }
   this.drawArc = function(arc) {
-    var thickness = (arc.id === settings.selected ? settings.selectedThickness : settings.lineThickness);
+    var thickness = (settings.isSelected(arc.id) ? settings.selectedThickness : settings.lineThickness);
     arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
   }
 
@@ -1852,7 +1883,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
   this.drawVector = function(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
         var radius = settings.pointRadius;
-        if (v.id === settings.selected) {
+        if (settings.isSelected(v.id)) {
           radius = settings.selectedRadius;
         }
         v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
@@ -2067,5 +2098,5 @@ function canvasToGrid(vector) {
   return v;
 }
 function flattenArray(arr) {
-  return arr.reduce((flat, row) => flat.concat(row), [])
+  return arr.reduce((flat, item) => Array.isArray(item) ? flat.concat(item) : flat.concat([item]), [])
 }
