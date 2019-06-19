@@ -6,6 +6,9 @@ var settings = {
   rescaleContent: false,
 
   selected: [],
+  lastSelected: function() {
+    return this.selected[this.selected.length - 1];
+  },
   selectRadius: 5,
   isSelected: function(id) {
     return this.selected.includes(id);
@@ -35,6 +38,21 @@ var settings = {
   vectorColor: '#f80',
   lineColor: '#0ac'
 };
+var selections = {
+  segmentSelections: [[], []],
+  segmentSelectionNo: 0,
+  addSegmentSelection: function(vector) {
+    console.log(this.segmentSelectionNo);
+    this.segmentSelections[this.segmentSelectionNo].push(vector);
+  }
+}
+/*var selections = {
+  groups: [[], []],
+  selectedGroup: 0,
+  getSelected: function() {
+    return this.groups[this.selectedGroup];
+  }
+}*/
 var ui = {
   canvas: document.getElementById('canvas'),
   canvasWrapper: document.getElementById('canvas-wrapper'),
@@ -211,22 +229,25 @@ var ui = {
 var commands = {
   getVectorFromMouse: function(mouse) {
     var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-
     if (settings.selecting && settings.selected.length) {
-      var vectorSelected = plane.getVector(settings.selected[0]);
-      if (vectorSelected) {
+      var lastSelected = settings.lastSelected();
+      var vectorSelected = plane.getVector(lastSelected);
+      if (vectorSelected && vectorSelected.distanceTo(vector) <=
+      settings.selectRadius) {
         vector = vectorSelected;
       }
       else {
-        var parentSelected = plane.getParent(settings.selected[0]);
-        vector = parentSelected.pointClosestTo(vector);
+        var parentSelected = plane.getParent(lastSelected);
+        if (parentSelected && parentSelected.distanceTo(vector) <= settings.selectRadius) {
+          vector = parentSelected.pointClosestTo(vector);
 
-        var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
-        if (existingVector) {
-          vector = existingVector;
-        }
-        else {
-          vector.fixTo(parentSelected);
+          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+          if (existingVector) {
+            vector = existingVector;
+          }
+          else {
+            vector.fixTo(parentSelected);
+          }
         }
       }
     }
@@ -264,10 +285,11 @@ var commands = {
     }
   },
   select: function(mouse, keys) {
-    console.log(keys);
     if (settings.selecting) {
-      // clear previous selection
-      settings.selected = [];
+      if (!keys.shift) {
+        // clear previous selection
+        settings.selected = [];
+      }
 
       ui.clearProps();
 
@@ -306,8 +328,16 @@ var commands = {
   move: function(mouse) {
     if (settings.mode === 'move' && mouse.down) {
       var translation = new Vector(mouse.deltaX, -mouse.deltaY);
+      settings.selected.forEach(id => {
+        if (settings.logToConsole) {
+          console.log("|\n|---Object " + id + " being translated---\n|");
+        }
+        plane.getObject(id).translate(translation);
+        log.objectCommands++;
+      });
 
-      var v = plane.getVector(settings.selected[0]);
+
+      /*var v = plane.getVector(settings.selected[0]);
       if (v) {
         if (settings.logToConsole) {
           console.log("|\n|---Vector " + v.id + " being translated---\n|");
@@ -323,17 +353,56 @@ var commands = {
           }
           l.translate(translation);
         }
-      }
+      }*/
     }
   },
-  segment: function(mouse) {
+  segment: function(mouse, keys) {
     if (settings.mode === 'segment') {
       // store vector temporarily
       var vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
+      if (!keys.shift) {
+        if (!selections.segmentSelections[0].length) {
+          selections.addSegmentSelection(vector);
+          selections.segmentSelectionNo++;
+        }
+        else {
+          selections.segmentSelectionNo = 1;
+          selections.addSegmentSelection(vector);
+          //if (selections.segmentSelectionNo === 0) {
+            //selections.addSegmentSelection(vector);
+            selections.segmentSelectionNo = 0;
+            selections.segmentSelections[0].forEach(p1 => {
+              selections.segmentSelections[1].forEach(p2 => {
+                plane.addVector(p2);
+                plane.addLine(new LineSegment(p1, p2));
+              });
+              plane.addVector(p1);
+            });
+            selections.segmentSelections.forEach(selection => selection.length = 0);
+            plane.tempVectors.splice(0);
+          //}
+        }
+      }
+      else {
+        selections.addSegmentSelection(vector);
+      }
+        /*if (selections.segmentSelectionNo === 2) {
+          selections.addSegmentSelection(vector);
+        }
+        else {
+          if (!selections.segmentSelections[0].length) {
+            selections.segmentSelections[0].push(vector);
+          }
+          else {
+            selections.addSegmentSelection(vector);
+          }
+        }
+
+      }*/
 
       // create segment when both vectors are available
-      if (plane.tempVectors.length === 2) {
+      /*if (plane.tempVectors.length === 2) {
         var seg = new LineSegment(plane.tempVectors[0], plane.tempVectors[1]);
 
         plane.tempVectors.forEach(v => plane.addVector(v));
@@ -343,7 +412,7 @@ var commands = {
 
         // clear temp vector storage
         plane.tempVectors.splice(0);
-      }
+      }*/
     }
   },
   arc: function(mouse) {
@@ -1955,6 +2024,9 @@ function Plane(grid) {
   this.getObjects = function() {
     return this.vectors.concat(this.lines).concat(this.arcs);
   }
+  this.getObject = function(id) {
+    return this.getObjects().filter(o => o.id === id)[0] || null;
+  }
   this.getParents = function() {
     return this.getObjects().filter(obj => !this.vectors.includes(obj));
   }
@@ -2007,13 +2079,17 @@ mouse.onMove(commands.pan, 0);
 mouse.onDown(commands.select, 0, [keyboard.keys]);
 mouse.onMove(commands.move, 0);
 mouse.onDown(commands.vector, 1);
-mouse.onDown(commands.segment, 1);
+mouse.onDown(commands.segment, 1, [keyboard.keys]);
 mouse.onDown(commands.line, 1);
 mouse.onDown(commands.arc, 1);
 mouse.onDown(commands.fix, 1);
 mouse.onMove(cam.update.bind(cam), 2);
 mouse.onDown(cam.update.bind(cam), 2);
 mouse.onWheel(cam.update.bind(cam), 2);
+
+keyboard.onDown("tab", function(keys) {
+  selections.segmentSelectionNo = 1 - selections.segmentSelectionNo;
+});
 
 function Keyboard() {
   this.keys = {};
