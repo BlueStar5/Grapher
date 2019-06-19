@@ -263,7 +263,8 @@ var commands = {
       }
     }
   },
-  select: function(mouse) {
+  select: function(mouse, keys) {
+    console.log(keys);
     if (settings.selecting) {
       // clear previous selection
       settings.selected = [];
@@ -2003,7 +2004,7 @@ mouse.onWheel(mouse => {
   cam.scaleContent((cam.dilation + Math.max(Math.min(mouse.deltaWheel * sensitivity, 200 - cam.dilation), 50 - cam.dilation)) / cam.dilation, new Vector(-mouse.wheelX, -mouse.wheelY).subtract(cam.min));
 }, 0);
 mouse.onMove(commands.pan, 0);
-mouse.onDown(commands.select, 0);
+mouse.onDown(commands.select, 0, [keyboard.keys]);
 mouse.onMove(commands.move, 0);
 mouse.onDown(commands.vector, 1);
 mouse.onDown(commands.segment, 1);
@@ -2067,12 +2068,11 @@ function Mouse() {
     this.mouse.x = newX;
     this.mouse.y = newY;
 
-    this.moveFunctions.forEach(list => {
-      list.forEach(f => f(this.mouse));
+    this.moveFunctions.forEach(priority => {
+      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
     });
     //cam.update(this.mouse);
   });
-
   ui.canvas.addEventListener('mousedown', e => {
     this.mouse.down = true;
 
@@ -2082,12 +2082,10 @@ function Mouse() {
     this.mouse.deltaX = 0;
     this.mouse.deltaY = 0;
 
-    this.downFunctions.forEach(list => {
-      list.forEach(f => f(this.mouse));
+    this.downFunctions.forEach(priority => {
+      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
     });
   });
-
-
   document.addEventListener('mouseup', e => this.mouse.down = false);
   ui.canvas.addEventListener('mousewheel', e => {
     this.mouse.deltaWheel = e.wheelDelta / 300;
@@ -2095,32 +2093,30 @@ function Mouse() {
     this.mouse.wheelX = e.clientX - ui.canvasOffsetX();
     this.mouse.wheelY = e.clientY;
 
-    this.wheelFunctions.forEach(list => {
-      list.forEach(f => f(this.mouse));
+    this.wheelFunctions.forEach(priority => {
+      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
     });
 
     this.mouse.deltaWheel = 0;
   });
 
-  this.onMove = function(f, priority) {
+  this.onMove = function(f, priority, args) {
     if (!this.moveFunctions[priority]) {
       this.moveFunctions[priority] = [];
     }
-    this.moveFunctions[priority].push(f);
+    this.moveFunctions[priority].push({f: f, args: args});
   };
-
-  this.onDown = function(f, priority) {
+  this.onDown = function(f, priority, args) {
     if (!this.downFunctions[priority]) {
       this.downFunctions[priority] = [];
     }
-    this.downFunctions[priority].push(f);
+    this.downFunctions[priority].push({f: f, args: args});
   };
-
-  this.onWheel = function(f, priority) {
+  this.onWheel = function(f, priority, args) {
     if (!this.wheelFunctions[priority]) {
       this.wheelFunctions[priority] = [];
     }
-    this.wheelFunctions[priority].push(f);
+    this.wheelFunctions[priority].push({f: f, args: args});
   }
 }
 function equal(x, y) {
