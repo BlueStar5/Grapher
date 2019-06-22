@@ -10,8 +10,8 @@ var settings = {
     return this.selected[this.selected.length - 1];
   },
   selectRadius: 5,
-  isSelected: function(id) {
-    return this.selected.includes(id);
+  isSelected: function(object) {
+    return this.selected.includes(object);
   },
 
   pointRadius: 4,
@@ -39,20 +39,62 @@ var settings = {
   lineColor: '#0ac'
 };
 var selections = {
-  segmentSelections: [[], []],
-  segmentSelectionNo: 0,
-  addSegmentSelection: function(vector) {
-    console.log(this.segmentSelectionNo);
-    this.segmentSelections[this.segmentSelectionNo].push(vector);
+  groups: [[], []],
+  groupNum: 0,
+  setNextGroup: function() {
+    if (this.groupNum === this.groups.length - 1) {
+      this.groupNum = 0;
+    }
+    else {
+      this.groupNum++;
+    }
+  },
+  getGroup: function(groupNum) {
+    if (groupNum === undefined) {
+      groupNum = this.groupNum;
+    }
+    return this.groups[groupNum];
+  },
+  clearSelection: function() {
+    this.getGroup().length = 0;
+  },
+  addToGroup: function(object, groupNum) {
+    var group;
+    if (groupNum !== undefined) {
+      group = this.groups[groupNum];
+    }
+    else {
+      group = this.getGroup();
+    }
+    if (!group.includes(object)) {
+      group.push(object);
+    }
+  },
+  setCommandGroup: function(command, groupNum) {
+    var commandGroups = this.commandSelectGroups[command];
+    if (groupNum === undefined) {
+      groupNum = this.groupNum;
+    }
+    if (!commandGroups.includes(groupNum)) {
+      commandGroups.push(groupNum);
+    }
+  },
+  getCommandGroups: function(command) {
+    console.log("Selections");
+    console.log(this.groups[0]);
+    console.log("Get command groups");
+    console.log(this.commandSelectGroups[command]);
+    return this.commandSelectGroups[command].map(groupNum => this.getGroup(groupNum));
+  },
+  clearCommandGroups: function(command) {
+    this.commandSelectGroups[command].forEach(groupNum =>
+      this.groups[groupNum].length = 0);
+    this.commandSelectGroups[command].length = 0;
+  },
+  commandSelectGroups: {
+    segment: []
   }
 }
-/*var selections = {
-  groups: [[], []],
-  selectedGroup: 0,
-  getSelected: function() {
-    return this.groups[this.selectedGroup];
-  }
-}*/
 var ui = {
   canvas: document.getElementById('canvas'),
   canvasWrapper: document.getElementById('canvas-wrapper'),
@@ -251,7 +293,6 @@ var commands = {
         }
       }
     }
-    console.log(vector);
     return vector;
   },
   pan: function(mouse) {
@@ -287,8 +328,7 @@ var commands = {
   select: function(mouse, keys) {
     if (settings.selecting) {
       if (!keys.shift) {
-        // clear previous selection
-        settings.selected = [];
+        selections.clearSelection();
       }
 
       ui.clearProps();
@@ -300,19 +340,19 @@ var commands = {
       var vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
 
       if (vector) {
-        settings.selected.push(vector.id);
+        selections.addToGroup(vector);
         ui.updateVectorProps(vector);
       }
       else {
         var line = plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
         if (line) {
-          settings.selected.push(line.id);
+          selections.addToGroup(line);
           ui.updateLineProps(line);
         }
         else {
           var arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
           if (arc) {
-            settings.selected.push(arc.id);
+            selections.addToGroup(arc);
           }
         }
       }
@@ -328,11 +368,11 @@ var commands = {
   move: function(mouse) {
     if (settings.mode === 'move' && mouse.down) {
       var translation = new Vector(mouse.deltaX, -mouse.deltaY);
-      settings.selected.forEach(id => {
+      settings.selected.forEach(obj => {
         if (settings.logToConsole) {
-          console.log("|\n|---Object " + id + " being translated---\n|");
+          console.log("|\n|---Object " + obj.id + " being translated---\n|");
         }
-        plane.getObject(id).translate(translation);
+        obj.translate(translation);
         log.objectCommands++;
       });
 
@@ -361,6 +401,35 @@ var commands = {
       // store vector temporarily
       var vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
+      selections.addToGroup(vector);
+      selections.setCommandGroup("segment");
+      var segmentGroups = selections.getCommandGroups("segment");
+      console.log("Segment Group 1");
+      segmentGroups[0].forEach(obj => console.log(obj));
+      if (!keys.shift) {
+        var segmentGroups = selections.getCommandGroups("segment");
+        console.log("Segment Group 1");
+        segmentGroups[0].forEach(obj => console.log(obj));
+
+        if (segmentGroups.length === 2) {
+          console.log("Segment Group 2");
+          segmentGroups[1].forEach(obj => console.log(obj));
+          segmentGroups[0].filter(obj => obj.constructor.name === Vector.name).forEach(p1 => {
+            plane.removeTempVector(p1);
+            plane.addVector(p1);
+            segmentGroups[1].filter(obj => obj.constructor.name === Vector.name).forEach(p2 => {
+              plane.removeTempVector(p2);
+              plane.addVector(p2);
+              plane.addLine(new LineSegment(p1, p2));
+            });
+          });
+          //plane.tempVectors.splice(0);
+          selections.clearCommandGroups("segment");
+        }
+        selections.setNextGroup();
+        console.log("Group Now: " + selections.groupNum);
+      }
+      /*
       if (!keys.shift) {
         if (!selections.segmentSelections[0].length) {
           selections.addSegmentSelection(vector);
@@ -369,49 +438,20 @@ var commands = {
         else {
           selections.segmentSelectionNo = 1;
           selections.addSegmentSelection(vector);
-          //if (selections.segmentSelectionNo === 0) {
-            //selections.addSegmentSelection(vector);
-            selections.segmentSelectionNo = 0;
-            selections.segmentSelections[0].forEach(p1 => {
-              selections.segmentSelections[1].forEach(p2 => {
-                plane.addVector(p2);
-                plane.addLine(new LineSegment(p1, p2));
-              });
-              plane.addVector(p1);
+          selections.segmentSelectionNo = 0;
+          selections.segmentSelections[0].forEach(p1 => {
+            selections.segmentSelections[1].forEach(p2 => {
+              plane.addVector(p2);
+              plane.addLine(new LineSegment(p1, p2));
             });
-            selections.segmentSelections.forEach(selection => selection.length = 0);
-            plane.tempVectors.splice(0);
-          //}
+            plane.addVector(p1);
+          });
+          selections.segmentSelections.forEach(selection => selection.length = 0);
+          plane.tempVectors.splice(0);
         }
       }
       else {
         selections.addSegmentSelection(vector);
-      }
-        /*if (selections.segmentSelectionNo === 2) {
-          selections.addSegmentSelection(vector);
-        }
-        else {
-          if (!selections.segmentSelections[0].length) {
-            selections.segmentSelections[0].push(vector);
-          }
-          else {
-            selections.addSegmentSelection(vector);
-          }
-        }
-
-      }*/
-
-      // create segment when both vectors are available
-      /*if (plane.tempVectors.length === 2) {
-        var seg = new LineSegment(plane.tempVectors[0], plane.tempVectors[1]);
-
-        plane.tempVectors.forEach(v => plane.addVector(v));
-        plane.addLine(seg);
-
-        ui.addObject("Line Segment ", seg);
-
-        // clear temp vector storage
-        plane.tempVectors.splice(0);
       }*/
     }
   },
@@ -1112,7 +1152,7 @@ function Vector(x, y) {
     return vector.subtract(this).magnitude();
   }
   this.update = function() {
-    if (settings.isSelected(this.id)) {
+    if (settings.isSelected(this)) {
       ui.updateVectorProps(this);
     }
     ui.addObject("Line Segment ", this);
@@ -1333,7 +1373,7 @@ function LineSegment(p1, p2) {
     this.children.forEach(c => {
       c.update();
     });
-    if (settings.isSelected(this.id)) {
+    if (settings.isSelected(this)) {
       ui.updateLineProps(this);
     }
   };
@@ -2006,7 +2046,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
   this.drawVector = function(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
         var radius = settings.pointRadius;
-        if (settings.isSelected(v.id)) {
+        if (settings.isSelected(v)) {
           radius = settings.selectedRadius;
         }
         v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
@@ -2029,6 +2069,9 @@ function Plane(grid) {
   }
   this.getParents = function() {
     return this.getObjects().filter(obj => !this.vectors.includes(obj));
+  }
+  this.removeTempVector = function(vector) {
+    this.tempVectors.splice(this.tempVectors.indexOf(vector), 1);
   }
 
   this.numObjects = function() {
@@ -2088,7 +2131,7 @@ mouse.onDown(cam.update.bind(cam), 2);
 mouse.onWheel(cam.update.bind(cam), 2);
 
 keyboard.onDown("tab", function(keys) {
-  selections.segmentSelectionNo = 1 - selections.segmentSelectionNo;
+  selections.setNextGroup();
 });
 
 function Keyboard() {
