@@ -42,18 +42,15 @@ var selections = {
   groups: [[], []],
   groupNum: 0,
   setNextGroup: function() {
-    if (this.groupNum === this.groups.length - 1) {
-      this.groupNum = 0;
+    if (this.selectedGroup === this.groups.length - 1) {
+      this.selectedGroup = 0;
     }
     else {
-      this.groupNum++;
+      this.selectedGroup++;
     }
   },
-  getGroup: function(groupNum) {
-    if (groupNum === undefined) {
-      groupNum = this.groupNum;
-    }
-    return this.groups[groupNum];
+  getGroup: function() {
+    return this.groups[this.groupNum];
   },
   clearSelection: function() {
     this.getGroup().length = 0;
@@ -80,16 +77,10 @@ var selections = {
     }
   },
   getCommandGroups: function(command) {
-    console.log("Selections");
-    console.log(this.groups[0]);
-    console.log("Get command groups");
-    console.log(this.commandSelectGroups[command]);
     return this.commandSelectGroups[command].map(groupNum => this.getGroup(groupNum));
   },
   clearCommandGroups: function(command) {
-    this.commandSelectGroups[command].forEach(groupNum =>
-      this.groups[groupNum].length = 0);
-    this.commandSelectGroups[command].length = 0;
+    this.commandSelectGroups[command] = [];
   },
   commandSelectGroups: {
     segment: []
@@ -293,6 +284,7 @@ var commands = {
         }
       }
     }
+    console.log(vector);
     return vector;
   },
   pan: function(mouse) {
@@ -401,34 +393,27 @@ var commands = {
       // store vector temporarily
       var vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
-      selections.addToGroup(vector);
-      selections.setCommandGroup("segment");
-      var segmentGroups = selections.getCommandGroups("segment");
-      console.log("Segment Group 1");
-      segmentGroups[0].forEach(obj => console.log(obj));
-      if (!keys.shift) {
-        var segmentGroups = selections.getCommandGroups("segment");
-        console.log("Segment Group 1");
-        segmentGroups[0].forEach(obj => console.log(obj));
-
-        if (segmentGroups.length === 2) {
-          console.log("Segment Group 2");
-          segmentGroups[1].forEach(obj => console.log(obj));
-          segmentGroups[0].filter(obj => obj.constructor.name === Vector.name).forEach(p1 => {
-            plane.removeTempVector(p1);
-            plane.addVector(p1);
-            segmentGroups[1].filter(obj => obj.constructor.name === Vector.name).forEach(p2 => {
-              plane.removeTempVector(p2);
-              plane.addVector(p2);
-              plane.addLine(new LineSegment(p1, p2));
-            });
-          });
-          //plane.tempVectors.splice(0);
-          selections.clearCommandGroups("segment");
-        }
-        selections.setNextGroup();
-        console.log("Group Now: " + selections.groupNum);
+      var command = log.getLastCommand();
+      if (!command || command.constructor.name !== SegmentCreation.name || command.finished) {
+        command = new SegmentCreation();
+        log.logCommand(command);
       }
+      command.addArg(vector);
+      if (!keys.shift) {
+        if (command.argsFilled()) {
+          command.execute();
+          if (keys.control) {
+            command = new SegmentCreation();
+            command.addArg(vector);
+            command.nextArg();
+            log.logCommand(command);
+          }
+        }
+        else {
+          command.nextArg();
+        }
+      }
+
       /*
       if (!keys.shift) {
         if (!selections.segmentSelections[0].length) {
@@ -502,6 +487,13 @@ var log = {
     this.plane.getObjects().filter(obj => !(transformation.exclude && transformation.exclude.includes(obj)))
     .forEach(obj => obj.receive(transformation));
   },
+  commands: [],
+  logCommand: function(command) {
+    this.commands.push(command);
+  },
+  getLastCommand: function() {
+    return this.commands[this.commands.length - 1];
+  },
   objectCommands: 0
 };
 ui.init();
@@ -542,6 +534,33 @@ plane.addVector(new Vector(0, 50));
 
 cam.update();
 
+function SegmentCreation() {
+  this.args = [[], []];
+  this.currentArg = 0;
+  this.finished = false;
+  this.addArg = function(arg) {
+    this.args[this.currentArg].push(arg);
+    plane.addTempVector(arg);
+  };
+  this.nextArg = function() {
+    this.currentArg = 1 - this.currentArg;
+  };
+  this.argsFilled = function() {
+    return this.args.every(arg => arg.length);
+  };
+  this.execute = function() {
+    this.args[0].forEach(p1 => {
+      plane.removeTempVector(p1);
+      plane.addVector(p1);
+      this.args[1].forEach(p2 => {
+        plane.removeTempVector(p2);
+        plane.addVector(p2);
+        plane.addLine(new LineSegment(p1, p2));
+      });
+    });
+    this.finished = true;
+  };
+}
 function Translation(object, vector, args) {
   this.id = 0;
   this.name = 'translation';
@@ -2131,7 +2150,7 @@ mouse.onDown(cam.update.bind(cam), 2);
 mouse.onWheel(cam.update.bind(cam), 2);
 
 keyboard.onDown("tab", function(keys) {
-  selections.setNextGroup();
+  selections.groupNum++;
 });
 
 function Keyboard() {
