@@ -1,7 +1,9 @@
 var settings = {
   mode: "pan",
 
-  selecting: false,
+  selecting: function() {
+
+  },
   focusZoom: true,
   rescaleContent: false,
 
@@ -48,6 +50,16 @@ var selections = {
     else {
       this.selectedGroup++;
     }
+  },
+  isSelected: function(object) {
+    return this.groups.some(group => group.includes(object));
+  },
+  getSelected: function() {
+    return this.groups[this.groupNum];
+  },
+  lastSelected: function() {
+    var selected = this.getSelected();
+    return selected[selected.length - 1];
   },
   getGroup: function() {
     return this.groups[this.groupNum];
@@ -262,24 +274,26 @@ var ui = {
 var commands = {
   getVectorFromMouse: function(mouse) {
     var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
-    if (settings.selecting && settings.selected.length) {
-      var lastSelected = settings.lastSelected();
-      var vectorSelected = plane.getVector(lastSelected);
-      if (vectorSelected && vectorSelected.distanceTo(vector) <=
-      settings.selectRadius) {
-        vector = vectorSelected;
-      }
-      else {
-        var parentSelected = plane.getParent(lastSelected);
-        if (parentSelected && parentSelected.distanceTo(vector) <= settings.selectRadius) {
-          vector = parentSelected.pointClosestTo(vector);
+    if (settings.selecting && selections.getSelected().length) {
+      var lastSelected = selections.lastSelected();
+      if (lastSelected &&
+        lastSelected.distanceTo(vector) <= settings.selectRadius) {
+        if (lastSelected.constructor.name === Vector.name) {
+          vector = lastSelected;
+        }
+        else {
+          if (lastSelected.constructor.name === LineSegment.name ||
+            lastSelected.constructor.name === Line.name ||
+            lastSelected.constructor.name === Arc.name) {
+            vector = lastSelected.pointClosestTo(vector);
 
-          var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
-          if (existingVector) {
-            vector = existingVector;
-          }
-          else {
-            vector.fixTo(parentSelected);
+            var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+            if (existingVector) {
+              vector = existingVector;
+            }
+            else {
+              vector.fixTo(lastSelected);
+            }
           }
         }
       }
@@ -360,7 +374,7 @@ var commands = {
   move: function(mouse) {
     if (settings.mode === 'move' && mouse.down) {
       var translation = new Vector(mouse.deltaX, -mouse.deltaY);
-      settings.selected.forEach(obj => {
+      selections.getSelected().forEach(obj => {
         if (settings.logToConsole) {
           console.log("|\n|---Object " + obj.id + " being translated---\n|");
         }
@@ -1171,7 +1185,7 @@ function Vector(x, y) {
     return vector.subtract(this).magnitude();
   }
   this.update = function() {
-    if (settings.isSelected(this)) {
+    if (selections.isSelected(this)) {
       ui.updateVectorProps(this);
     }
     ui.addObject("Line Segment ", this);
@@ -1392,7 +1406,7 @@ function LineSegment(p1, p2) {
     this.children.forEach(c => {
       c.update();
     });
-    if (settings.isSelected(this)) {
+    if (selections.isSelected(this)) {
       ui.updateLineProps(this);
     }
   };
@@ -1974,7 +1988,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
           if (gridColors) {
             thickness = settings.gridThickness;
           }
-          else if (settings.isSelected(l.id)) {
+          else if (selections.isSelected(l)) {
             thickness = settings.selectedThickness;
           }
           // draw the LineSegment of the line that's in the grid
@@ -2006,7 +2020,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
     arcs.forEach(a => this.drawArc(a));
   }
   this.drawArc = function(arc) {
-    var thickness = (settings.isSelected(arc.id) ? settings.selectedThickness : settings.lineThickness);
+    var thickness = (selections.isSelected(arc) ? settings.selectedThickness : settings.lineThickness);
     arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
   }
 
@@ -2065,7 +2079,7 @@ function Camera(minX, minY, maxX, maxY, plane) {
   this.drawVector = function(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
         var radius = settings.pointRadius;
-        if (settings.isSelected(v)) {
+        if (selections.isSelected(v)) {
           radius = settings.selectedRadius;
         }
         v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
