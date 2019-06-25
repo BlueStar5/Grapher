@@ -511,6 +511,1026 @@ var log = {
   },
   objectCommands: 0
 };
+abstract class GeomObject {
+  id: number;
+  constructor() {
+    this.id = undefined;
+  }
+  readonly constraints = {
+    fixedTo: <GeomObject[]> []
+  };
+  fixTo(obj: GeomObject) {
+    this.constraints.fixedTo.push(obj);
+  };
+  fixedTo(obj: GeomObject): boolean {
+    return this.constraints.fixedTo.includes(obj);
+  }
+  setId(id: number) {
+    this.id = id;
+  }
+  abstract translate(vector: Vector): void;
+  abstract translated(vector: Vector): GeomObject;
+  abstract dilated(center: Vector, factor: number): GeomObject;
+  abstract rotated(center: Vector, angle: number): GeomObject;
+  abstract distanceTo(vector: Vector): number;
+  abstract receive(transformation): void;
+  abstract pointClosestTo(vector: Vector): Vector;
+  abstract clone(): GeomObject;
+  abstract nameString(): string;
+  abstract detailsString(): string;
+  abstract toString(): string;
+  abstract draw(offset: Vector, dilation: number, color: string,
+    thickness: number): void;
+}
+abstract class DimensionalObject extends GeomObject {
+  abstract getLineIntersection(line: GeomObject): GeomObject;
+  abstract getArcIntersection(arc: Arc): GeomObject;
+  abstract getLocusIntersection(locus: typeof Locus): GeomObject;
+  abstract getIntersection(obj: GeomObject): GeomObject;
+  abstract containsPoint(point: Vector): boolean;
+}
+abstract class LinearObject extends DimensionalObject {
+  p1: Vector;
+  p2: Vector;
+  endpoints: Vector[] = [];
+  constructor(p1, p2) {
+    super();
+    this.p1 = p1;
+    this.p2 = p2;
+    this.setEndpoint(p1);
+    this.setEndpoint(p2);
+  }
+  setEndpoint(vector) {
+    this.endpoints.push(vector);
+    this.fixTo(vector);
+    vector.fixTo(this);
+  };
+  hasEndpoint(vector): boolean {
+    return this.endpoints.includes(vector);
+  };
+  abstract yInt(): number;
+  midpoint(): Vector {
+    return this.p1.add(this.p2).divide(2);
+  };
+  abstract extended(endpoint: Vector, distance: number): LinearObject;
+  abstract onLine(point: Vector): boolean;
+  abstract getX(y: number): number;
+  abstract getY(x: number): number;
+  abstract perpThrough(point: Vector): LinearObject;
+  abstract getSlope(): number;
+}
+class Arc extends DimensionalObject {
+  rotated(center: Vector, angle: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  angle: Angle;
+  center: Vector;
+  constructor(angle) {
+    super();
+    this.angle = angle;
+    this.center = angle.vertex;
+    this.fixTo(this.center);
+    this.fixTo(this.angle.p1);
+    this.fixTo(this.angle.p2);
+    this.center.fixTo(this);
+    this.angle.p1.fixTo(this);
+    this.angle.p2.fixTo(this);
+  }
+  translated(vector): Arc {
+    return new Arc(this.angle.translated(vector));
+  }
+  getRadius(): number {
+    return this.angle.p1.distanceTo(this.center);
+  }
+  distanceTo(vector): number {
+    if (this.angle.inside(vector)) {
+      return Math.abs(vector.distanceTo(this.center) - this.getRadius());
+    }
+    else {
+      return Math.min(vector.distanceTo(this.angle.p1), vector.distanceTo(this.angle.p2));
+    }
+  }
+  getLocusIntersection(locus): GeomObject {
+    return locus.getSingleObjIntersection(this);
+  }
+  getIntersection(obj): GeomObject {
+    if (obj.constructor.name === LineSegment.name ||
+      obj.constructor.name === Line.name) {
+        return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Arc.name) {
+      return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Locus.name) {
+      return this.getLocusIntersection(obj);
+    }
+  };
+  getArcIntersection(arc): GeomObject {
+    /*
+      Let d be the distance between centers
+      Let P1 and P2 be the centers
+      Let P3 be the midpoint of the intersections
+      Let segments d1 and d2 be P1P3 and P2P3, respectively
+      Let h be the distance from P3 to either intersection
+
+      d1^2 + h^2 = r1^2
+      d2^2 + h^2 = r2^2
+
+      d = d1 + d2
+      d2 = d - d1
+
+      (d - d1)^2 + h^2 = r2^2
+      d^2 - 2d1d + d1^2 + h^2 = r2^2
+      d^2 - 2d1d = r2^2 - r1^2
+      -2d1d = r2^2 - r1^2 - d^2
+      d1 = (d^2 + r1^2 - r2^2) / (2d)
+
+      h^2 = r1^2 - d1^2
+      h = sqrt(r1^2 - d1^2)
+
+      P3 = P1 + d1(P2 - P1) / d
+
+      x4 = x3 +- h(y2 - y1) / d
+      y4 = y3 +- h(x2 - x1) / d
+      */
+    var c1 = this.center;
+    var c2 = arc.center;
+    var d = c2.distanceTo(c1);
+    var d1 = (sqr(d) + sqr(this.getRadius()) - sqr(arc.getRadius())) / (2 * d);
+
+    var intToIntsMP = Math.sqrt(sqr(this.getRadius()) - sqr(d1));
+    var intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
+
+    var int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+    var int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+
+    if (!int1.equals(int2)) {
+      return new Locus([int1, int2]);
+    }
+    else {
+      return int1;
+    }
+  }
+  translate(vector): void {
+    log.broadcast(new Translation(this, vector, {preImage: this}));
+  }
+  dilated(center, factor) {
+    return new Arc(this.angle.dilated(center, factor));
+  }
+  receive(transformation) {
+    var existingExclusions = [];
+    if (transformation.args && transformation.args.exclude) {
+      existingExclusions = transformation.args.exclude;
+    }
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object)) {
+        if (transformation.object == this.center) {
+          var translation = transformation;
+
+          log.broadcast(new Translation(this, translation.vector,
+            {preImage: this, exclude: existingExclusions.concat([translation.object])}));
+
+        }
+        else {
+          var dilation = transformation;
+          var prevRadius = dilation.getPreImage().distanceTo(this.center);
+          var newRadius = dilation.getImage().distanceTo(this.center);
+          log.broadcast(new Dilation(this, this.center, newRadius / prevRadius,
+            {exclude: existingExclusions.concat([dilation.object]), preImage: this}))
+        }
+    }
+
+  }
+  getLineIntersection(line) {
+    var distToCenter = line.distanceTo(this.center);
+    if (lessOrEqual(distToCenter, this.getRadius())) {
+      var chordMidpoint = line.extended().pointClosestTo(this.center);
+      var halfChordLength = Math.sqrt(this.getRadius() * this.getRadius() - distToCenter * distToCenter);
+
+      var slopeVector = new Vector(1, line.getSlope()).normalize();
+      var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
+      var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
+      var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
+      if (ints.length == 1) {
+        return ints[0];
+      }
+      else {
+        return new Locus(ints);
+      }
+    }
+    else {
+      return undefined;
+    }
+  }
+  containsPoint(vector) {
+    return this.angle.inside(vector) && equal(vector.distanceTo(this.center), this.getRadius()) ||
+    vector.equals(this.angle.p1) || vector.equals(this.angle.p2);
+  }
+  pointClosestTo(vector) {
+    if (this.angle.inside(vector)) {
+      var direction = vector.subtract(this.center).normalize();
+      console.log(direction);
+      return this.center.add(direction.multiply(this.getRadius()));
+    }
+    else {
+      console.log('outside');
+      return vector.getClosest(this.angle.p1, this.angle.p2);
+    }
+  }
+
+  clone() {
+    return new Arc(this.angle.clone());
+  }
+  nameString() {
+    if (this.id !== undefined) {
+      return 'Arc ' + this.id;
+    }
+    else {
+      return 'Arc';
+    }
+  }
+  detailsString() {
+    return `${this.center.detailsString()} r=${this.getRadius()}`
+  }
+  toString() {
+    return `${this.nameString()} ${this.detailsString()}`;
+  }
+
+  fixedTo(obj) {
+    return this.constraints.fixedTo.includes(obj);
+  };
+  setId(id) {
+    this.id = id;
+  };
+  draw(offset, dilation, color, thickness) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+
+    // ctx.translate(.5, .5);
+    offset = offset || new Vector(0, 0);
+
+    ctx.beginPath();
+    ctx.arc(roundFromZero(this.center.x * dilation + offset.x), roundFromZero(-this.center.y * dilation + offset.y),
+      this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
+    ctx.stroke();
+    // ctx.translate(-.5, -.5);
+  }
+}
+class Angle extends GeomObject {
+  translate(vector: Vector): void {
+    throw new Error("Method not implemented.");
+  }
+  rotated(center: Vector, angle: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  distanceTo(vector: Vector): number {
+    throw new Error("Method not implemented.");
+  }
+  receive(transformation: any): void {
+    throw new Error("Method not implemented.");
+  }
+  pointClosestTo(vector: Vector): Vector {
+    throw new Error("Method not implemented.");
+  }
+  nameString(): string {
+    throw new Error("Method not implemented.");
+  }
+  detailsString(): string {
+    throw new Error("Method not implemented.");
+  }
+  toString(): string {
+    throw new Error("Method not implemented.");
+  }
+  draw(offset: Vector, dilation: number, color: string, thickness: number): void {
+    throw new Error("Method not implemented.");
+  }
+  constructor(public p1: Vector, public vertex: Vector, public p2: Vector) {
+    super();
+  }
+
+  getStartAngle() {
+    return this.p1.angle(this.vertex);
+  }
+  getEndAngle() {
+    return this.p2.angle(this.vertex);
+  }
+  toCCW(angle) {
+    return (Math.PI * 2 + angle) % (Math.PI * 2);
+  }
+  inside(vector) {
+    var vectorAngle = vector.rotated(this.vertex, -this.getStartAngle()).angle(this.vertex);
+    return vectorAngle > 0 && vectorAngle < this.getMeasure();
+  }
+  getMeasure() {
+    return this.toCCW(this.p2.angle(this.vertex) - this.p1.angle(this.vertex));
+  }
+  translated(vector) {
+    return new Angle(this.p1.translated(vector), this.vertex.translated(vector),
+    this.p2.translated(vector));
+  }
+  dilated(center, factor) {
+    return new Angle(this.p1.dilated(center, factor),
+    this.vertex.dilated(center, factor), this.p2.dilated(center, factor));
+  }
+  clone() {
+    return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
+  }
+  equals(angle) {
+    equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
+  }
+}
+class Vector extends GeomObject {
+  x: number;
+  y: number;
+  endpointOf: GeomObject[] = [];
+  constructor(x: number, y: number) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
+  setAsEndpoint(line) {
+    this.endpointOf.push(line);
+  };
+  isEndpointOf(line) {
+    return this.endpointOf.includes(line);
+  };
+  draw(offset, color, dilation, radius) {
+    offset = offset || new Vector(0, 0);
+    ctx.fillStyle = color;
+
+    ctx.beginPath();
+    ctx.arc(roundFromZero(this.x * dilation + offset.x), roundFromZero(-this.y * dilation + offset.y), radius, 0, 2 * Math.PI, true);
+    ctx.fill();
+    ctx.fillText(`${this.id}`,
+      roundFromZero(this.x * dilation + offset.x) - settings.pointRadius / 2,
+      roundFromZero(-this.y * dilation + offset.y) -settings.pointRadius / 2 +
+      14, 20);
+  };
+  angle(center?) {
+    var x;
+    var y;
+    if (center) {
+      var relativeVector = this.subtract(center);
+      x = relativeVector.x;
+      y = relativeVector.y;
+    }
+    else {
+      x = this.x;
+      y = this.y;
+    }
+    var refAngle = Math.abs(Math.atan(y / x));
+    var angle = refAngle;
+    if (x < 0 && y > 0) {
+      angle = Math.PI - refAngle;
+    }
+    if (y < 0 && x > 0) {
+      angle = Math.PI * 2 - refAngle;
+    }
+    if (x < 0 && y < 0) {
+      angle = Math.PI + refAngle;
+    }
+    return angle;
+  };
+  translate(vector, translation?) {
+    var image = this.add(vector);
+    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
+
+    // if a parent is trying to translate, let this act as if fixed to its image
+    // instead to prevent a conflict
+    if (translation) {
+      fixedTo = fixedTo.filter(obj => obj !== translation.object);
+      if (!translation.object.fixedTo(this)) {
+        fixedTo.push(translation.getImage());
+      }
+    }
+    if (fixedTo.length) {
+      // try to translate to the closest intersection of all parents
+      // if there is no intersection, then this point can't move anywhere
+      var intersection = new Locus(fixedTo).getSelfIntersection();//fixedTo[0].getIntersection(fixedTo.slice(1));
+      if (intersection) {
+        image = intersection.pointClosestTo(image);
+      }
+      //image = intersection ? image.getClosest(intersection) : this;
+    }
+    var displacement = image.subtract(this);
+    this.setPosition(image);
+    if (translation) {
+      var exclude = [translation.object];
+      if (translation.args && translation.args.exclude) {
+        exclude = exclude.concat(translation.args.exclude);
+      }
+      log.broadcast(new Translation(this, displacement, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Translation(this, displacement));
+    }
+  }
+  dilate(center, factor, dilation) {
+    this.setPosition(this.dilated(center, factor));
+    if (dilation) {
+      var exclude = [dilation.object];
+      if (dilation.args && dilation.args.exclude) {
+        exclude = exclude.concat(dilation.args.exclude);
+      }
+      log.broadcast(new Dilation(this, center, factor, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Dilation(this, center, factor));
+    }
+  }
+  dilated(center, factor) {
+    return this.subtract(center).multiply(factor).add(center);
+  }
+  receive(transformation) {
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object) /*&& !this.received.some(t => t.similarTo(transformation))*/) {
+      if (transformation.name === 'translation') {
+        var translation = transformation;
+        this.translate(translation.vector, translation);
+      }
+      if (transformation.name === 'rotation') {
+        var rotation = transformation;
+        if (!rotation.center.equals(this)) {
+          this.rotate(rotation.center, rotation.radians, rotation);
+        }
+      }
+      if (transformation.name === 'extension') {
+        var extension = transformation;
+        var line: Line = extension.object;
+        var fixedTo = line.constraints.fixedTo;
+        if (!fixedTo.includes(this)) {
+          var endpoint = extension.endpoint;
+          var otherEndpoint = line.endpoints.filter(p => p !== endpoint)[0];
+          console.log(endpoint.toString());
+          console.log(otherEndpoint.toString());
+          // if endpoint passed this point, then move this point back to endpoint
+          if (endpoint.distanceTo(otherEndpoint) < this.distanceTo(otherEndpoint)) {
+            this.translate(endpoint.subtract(this));
+          }
+        }
+      }
+      if (transformation.name === 'dilation') {
+        var dilation = transformation;
+        if (!dilation.center.equals(this)) {
+          this.dilate(transformation.center, transformation.factor, dilation);
+        }
+      }
+    }
+  }
+  getClosest(locus) {
+    // map each object to its point closest to this, then reduce that array of
+    // points to the closest one
+    return locus.get().map(v => v.pointClosestTo(this)).reduce((closest, cur) =>
+    this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
+  }
+  pointClosestTo(vector) {
+    return this;
+  }
+  distanceTo(vector) {
+    return vector.subtract(this).magnitude();
+  }
+  update() {
+    if (selections.isSelected(this)) {
+      ui.updateVectorProps(this);
+    }
+    ui.addObject("Line Segment ", this);
+  }
+  setPosition(vector, callers?) {
+    if (callers) {
+      /*var initial = this.clone();
+      this.parents.forEach(p => {
+        if (callers.includes(p)) {
+          this.x = vector.x;
+          this.y = vector.y;
+        }
+        else {
+          this.x = initial.x;
+          this.y = initial.y;
+          callers.push(this);
+          p.shift(vector.subtract(this), callers);
+        }
+      });*/
+    }
+    else {
+      this.x = vector.x;
+      this.y = vector.y;
+    }
+  }
+  rotate(center, radians, rotation) {
+    this.setPosition(this.rotated(center, radians));
+    if (rotation) {
+      var exclude = [rotation.object];
+      if (rotation.args && rotation.args.exclude) {
+        exclude = exclude.concat(rotation.args.exclude);
+      }
+      log.broadcast(new Rotation(this, center, radians, {exclude: exclude}));
+    }
+    else {
+      log.broadcast(new Rotation(this, center, radians));
+    }
+  }
+  rotated(center, radians) {
+    var relativeVector = this.subtract(center);
+    var angleSum = relativeVector.angle() + radians;
+    if (!isNaN(angleSum)) {
+      return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
+    }
+    return this;
+  }
+  translated(vector) {
+    return this.add(vector);
+  }
+  add(vector) {
+    return new Vector(this.x + vector.x, this.y + vector.y);
+  }
+  subtract(vector) {
+    return new Vector(this.x - vector.x, this.y - vector.y);
+  }
+  multiply(scalar) {
+    return new Vector(this.x * scalar, this.y * scalar);
+  }
+  normal(CW) {
+    if (CW) {
+      return new Vector(this.y, -this.x);
+    }
+    return new Vector(-this.y, this.x);
+  }
+  divide(scalar) {
+    return new Vector(this.x / scalar, this.y / scalar);
+  }
+  normalize() {
+    return new Vector(this.x / this.magnitude(), this.y / this.magnitude());
+  }
+  floorTowardZero() {
+    return new Vector(floorTowardZero(this.x), floorTowardZero(this.y));
+  }
+  roundFromZero(dPlaces) {
+    return new Vector(roundFromZero(this.x, dPlaces), roundFromZero(this.y, dPlaces));
+  }
+  negative() {
+    return new Vector(-this.x, -this.y);
+  }
+  magnitude() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  equals(vector) {
+    return equal(this.x, vector.x) && equal(this.y, vector.y);
+  }
+  clone(id?: number) {
+    var clone = new Vector(this.x, this.y);
+    clone.setId(id);
+    return clone;
+  }
+  nameString() {
+    if (this.id !== undefined) {
+      return 'Vector ' + this.id;
+    }
+    else {
+      return 'Vector';
+    }
+  }
+  detailsString() {
+    return `\(${roundFromZero(this.x, 2)}, ${roundFromZero(this.y, 2)}\)`
+  }
+  toString() {
+    return `${this.nameString()} ${this.detailsString()}`;
+  }
+}
+class LineSegment extends LinearObject {
+  p1: Vector;
+  p2: Vector;
+  constructor(p1: Vector, p2: Vector) {
+    super(p1, p2);
+  }
+  yInt() {
+    return this.extended().getY(0);
+  };
+  midpoint() {
+    return this.p1.add(this.p2).divide(2);
+  };
+  receive(transformation) {
+    var fixedTo = this.constraints.fixedTo;
+    if (fixedTo.includes(transformation.object)) {
+        var translation = transformation;
+
+        // p1 isn't the translated vector; p2 is the translated vector before translation
+        var preImagePoint = translation.getPreImage();
+        var otherEndpoint = [this.p1, this.p2].filter(p => p !== translation.object)[0].clone();
+        var preImageMidpoint = new LineSegment(otherEndpoint, preImagePoint).midpoint();
+
+        // the rotation center will be the reflection of the preimage translated point in the midpoint
+        var vectorToMidpoint = preImagePoint.subtract(preImageMidpoint);
+        var center = preImageMidpoint.subtract(vectorToMidpoint);
+
+        var oldAngle = preImagePoint.angle(otherEndpoint);
+        var newAngle = translation.getImage().angle(otherEndpoint);
+        var angle = newAngle - oldAngle;
+
+        var existingExclusions = [];
+        if (transformation.args && transformation.args.exclude) {
+          existingExclusions = transformation.args.exclude;
+        }
+        var rotation = new Rotation(this, center, angle, {exclude: [translation.object].concat(existingExclusions), preImage: this});
+        var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
+        var endpoint = translation.getPreImage().rotated(center, angle);
+        //var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
+        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object].concat(existingExclusions), preImage: this});
+
+        log.broadcast(rotation);
+        log.broadcast(dilation);
+        //log.broadcast(extension);
+    }
+  };
+  translated(vector: Vector) {
+    return new LineSegment(this.p1.translated(vector), this.p2.translated(vector));
+  };
+  extended(endpoint?, distance?) {
+    if (arguments.length === 0) {
+      return new Line(this.p1.clone(), this.p2.clone());
+    }
+    var otherEndpoint = [this.p1, this.p2].filter(p => p !== endpoint)[0];
+    var slopeVector = endpoint.subtract(otherEndpoint).normalize();
+    var translation = slopeVector.multiply(distance);
+
+    var p1, p2;
+    if (this.p1 === endpoint) {
+      p1 = endpoint.add(translation);
+      p2 = otherEndpoint.clone();
+    }
+    else {
+      p1 = otherEndpoint.clone();
+      p2 = endpoint.add(translation);
+    }
+    return new LineSegment(p1, p2);
+  };
+  rotated(center, radians) {
+    var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
+    return new LineSegment(endpoints[0], endpoints[1]);
+  };
+  dilated(center: Vector, factor: number) {
+    return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
+  };
+  onLine(vector) {
+    return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
+  };
+  update() {
+    /*this.children.forEach(c => {
+      c.update();
+    });
+    if (selections.isSelected(this)) {
+      ui.updateLineProps(this);
+    }*/
+  };
+  translate(vector) {
+    log.broadcast(new Translation(this, vector, {preImage: this}));
+  };
+  getX(y) {
+    if (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y) {
+      return (y - this.p1.y) / this.getSlope() + this.p1.x;
+    }
+    return undefined;
+  };
+  getY(x) {
+    if (x >= this.p1.x && x <= this.p2.x || x <= this.p1.x && x >= this.p2.x) {
+      return this.getSlope() * (x - this.p1.x) + this.p1.y;
+    }
+    return undefined;
+  };
+  perpThrough(vector) {
+    var perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
+
+    if (this.getLineIntersection(perp)) {
+      return perp;
+    }
+    return undefined;
+  };
+  distanceTo(vector) {
+    var perp = this.perpThrough(vector);
+    if (perp) {
+      return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
+    }
+    else {
+      return Math.min(vector.subtract(this.p1).magnitude(), vector.subtract(this.p2).magnitude());
+    }
+  };
+  pointClosestTo(vector: Vector): Vector {
+    var perp = this.perpThrough(vector);
+    if (perp) {
+      return <Vector> this.getLineIntersection(perp);
+    }
+    else {
+      return vector.subtract(this.p2).magnitude() < vector.subtract(this.p1).magnitude() ? this.p2 : this.p1;
+    }
+  };
+  draw(offset, color, dilation, thickness) {
+    ctx.lineWidth = thickness;
+
+    ctx.translate(.5, .5);
+    offset = offset || new Vector(0, 0);
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(roundFromZero(this.p1.x * dilation + offset.x), roundFromZero(-this.p1.y * dilation + offset.y));
+    ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
+    ctx.stroke();
+    ctx.translate(-.5, -.5);
+  };
+  getSlope() {
+    return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
+  };
+  containsPoint(vector) {
+    return this.onLine(vector);
+  }
+  getLineIntersection(line) {
+    /* m(x - x1) + y = n(x - x2) + b
+    * mx - mx1 + y = nx - nx2 + b
+    * mx - nx = b - nx2 + mx1 - y
+    * x = (b - y + mx1 - nx2) / (m - n)
+    */
+    if (this.getSlope() !== line.getSlope()) {
+      var x;
+      if (Math.abs(this.getSlope()) === Infinity) {
+        x = this.p1.x;
+        let y = line.getY(x);
+
+        if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
+          return new Vector(x, y);
+        }
+      }
+      else if (Math.abs(line.getSlope()) === Infinity) {
+        x = line.p1.x;
+        var y = this.getY(x);
+
+        if (y !== undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
+          return new Vector(x, y);
+        }
+      }
+      else {
+        x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
+        if (this.getY(x) !== undefined && line.getY(x) !== undefined) {
+          return new Vector(x, this.getY(x));
+        }
+      }
+    }
+    // if the line(segment)s are (on) the same line, their intersection is a line(segment)
+    else if (this.equals(line)) {
+      return this.clone();
+    }
+  }
+  getIntersection(obj) {
+    if (obj.constructor.name === LineSegment.name ||
+      obj.constructor.name === Line.name) {
+        return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Arc.name) {
+      return this.getLineIntersection(obj);
+    }
+    if (obj.constructor.name === Locus.name) {
+      return this.getLocusIntersection(obj);
+    }
+  };
+  getArcIntersection(arc) {
+    return arc.getLineIntersection(this);
+  }
+  getLocusIntersection(locus) {
+    return locus.getSingleObjIntersection(this);
+  }
+  equals(line) {
+    return this.p1.equals(line.p1) && this.p2.equals(line.p2);
+  };
+  clone() {
+    return new LineSegment(this.p1.clone(), this.p2.clone());
+  };
+  length() {
+    return this.p2.subtract(this.p1).magnitude();
+  };
+  nameString() {
+    if (this.id !== undefined) {
+      return 'Line Segment ' + this.id;
+    }
+    else {
+      return 'Line Segment';
+    }
+  };
+  detailsString() {
+    return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
+  };
+  toString() {
+    return `${this.nameString()} ${this.detailsString()}`
+  };
+}
+class Line extends LinearObject {
+  yInt(): number {
+    throw new Error("Method not implemented.");
+  }
+  getLocusIntersection(locus: (set: any) => void): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  dilated(center: Vector, factor: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  rotated(center: Vector, angle: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  constructor(p1, p2?) {
+    if (!p2) {
+      var args = p1;
+      if (args.slope !== undefined && args.p !== undefined) {
+        p1 = args.p;
+        p2 = args.p.add(new Vector(1, args.slope));
+      }
+    }
+    super(p1, p2);
+  }
+  receive() {
+
+  }
+  translate(vector) {
+    log.broadcast(new Translation(this, vector, {preImage: this}));
+  }
+  translated(vector) {
+    return new Line(this.p1.translated(vector), this.p2.translated(vector));
+  }
+  midpoint() {
+    return this.p1.add(this.p2).divide(2);
+  }
+  getX(y) {
+    if (Math.abs(this.getSlope()) === Infinity) {
+      return this.p1.x;
+    }
+    if (this.getSlope() === 0) {
+      return undefined;
+    }
+    return (y - this.p1.y) / this.getSlope() + this.p1.x;
+  }
+  containsPoint(vector) {
+    return this.onLine(vector);
+  }
+  getY(x) {
+    if (Math.abs(this.getSlope()) === Infinity) {
+      return undefined;
+    }
+    if (this.getSlope() === 0) {
+      return this.p1.y;
+    }
+    return this.getSlope() * (x - this.p1.x) + this.p1.y;
+  }
+  onLine(vector) {
+    return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
+  }
+  perpThrough(vector) {
+    return new Line({slope: -1 / this.getSlope(), p: vector.clone()});
+  }
+  distanceTo(vector) {
+    return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
+    //return vector.subtract(this.getIntersection(this.perpThrough(vector)).point()).magnitude();
+
+  }
+  pointClosestTo(vector) {
+    return this.getLineIntersection(this.perpThrough(vector));
+    // return this.getIntersection(this.perpThrough(vector)).point();
+  }
+
+  draw(offset, color, dilation, thickness) {
+    ctx.lineWidth = thickness;
+
+    ctx.translate(.5, .5);
+    offset = offset || new Vector(0, 0);
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(roundFromZero(this.p1.x * dilation + offset.x), roundFromZero(-this.p1.y * dilation + offset.y));
+    ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
+    ctx.stroke();
+    ctx.translate(-.5, -.5);
+  }
+  getSlope() {
+    return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
+  }
+  getLineIntersection(line) {
+    var x;
+    if (this.getSlope() != line.getSlope()) {
+      // handle vertical lines
+      if (Math.abs(this.getSlope()) == Infinity) {
+        x = this.p1.x;
+        let y = line.getY(x);
+
+        if (y != undefined) {
+          return new Vector(x, y);
+        }
+      }
+      else if (Math.abs(line.getSlope()) == Infinity) {
+        x = line.p1.x;
+        let y = this.getY(x);
+
+        if (y >= line.p1.y && y <= line.p2.y || y <= line.p1.y && y >= line.p2.y) {
+          return new Vector(x, y);
+        }
+      }
+      else {
+        x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
+        if (this.getY(x) != undefined && line.getY(x) != undefined) {
+          return new Vector(x, this.getY(x));
+        }
+      }
+    }
+    else if (this.equals(line)) {
+      return line.clone();
+    }
+  }
+  getIntersection(obj) {
+    /* m(x - x1) + y = n(x - x2) + b
+    * mx - mx1 + y = nx - nx2 + b
+    * mx - nx = b - nx2 + mx1 - y
+    * x = (b - y + mx1 - nx2) / (m - n)
+    */
+    /*var objs = [];
+    if (Array.isArray(obj)) {
+      objs = obj.concat([this]);
+      obj = objs[0];
+    }
+    var intersection;
+
+    if (obj.constructor.name === LineSegment.name ||
+      obj.constructor.name === Line.name) {
+        intersection = this.getLineIntersection(obj);
+        // the intersection is a line if the objects are collinear lines
+        if (!intersection) {
+          return undefined;
+        }
+        if (intersection.constructor.name === LineSegment.name ||
+          intersection.constructor.name === Line.name) {
+            if (objs.length > 1) {
+              objs.shift();
+              return this.getIntersection(objs);
+            }
+            else {
+              return obj.clone();
+            }
+        }
+    }
+    if (obj.constructor.name === Arc.name) {
+      intersection = obj.getLineIntersection(this);
+      if (!intersection) {
+        return undefined;
+      }
+    }
+    if (obj.constructor.name === Locus.name) {
+      intersection = obj.getSingleObjIntersection(this).get();
+    }
+    if (Array.isArray(intersection)) {
+      intersection = intersection.filter(int => objs.every(o => o.containsPoint(int)));
+      if (!intersection.length) {
+        return undefined;
+      }
+      else {
+        intersection = intersection[0];
+      }
+    }
+    if (intersection && objs.some(o => !o.containsPoint(intersection))) {
+      return undefined;
+    }*/
+
+      if (obj.constructor.name === LineSegment.name ||
+        obj.constructor.name === Line.name) {
+          return this.getLineIntersection(obj);
+      }
+      if (obj.constructor.name === Arc.name) {
+        return this.getLineIntersection(obj);
+      }
+      if (obj.constructor.name === Locus.name) {
+        return this.getLocusIntersection(obj);
+      }
+    //return intersection;
+  }
+  getArcIntersection(arc) {
+    return arc.getLineIntersection(this);
+  }
+  equals(line) {
+    return this.p1.equals(line.p1) && this.p2.equals(line.p2) || this.p1.equals(line.p2) && this.p2.equals(line.p1);
+  }
+  clone() {
+    return new Line(this.p1.clone(), this.p2.clone());
+  }
+  extended() {
+    return this.clone();
+  }
+  length() {
+    return Infinity;
+  }
+  nameString() {
+    if (this.id !== undefined) {
+      return 'Line ' + this.id;
+    }
+    else {
+      return 'Line ';
+    }
+  }
+  detailsString() {
+    return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
+  }
+  toString() {
+    return `${this.nameString()} ${this.detailsString()}`
+  }
+}
 ui.init();
 
 var ctx = ui.canvas.getContext('2d');
@@ -732,1049 +1752,7 @@ function Dilation(object, center, factor, args?) {
   // }
 }
 
-function Arc(angle) {
-  this.id = undefined;
-  this.angle = angle;
-  this.center = angle.vertex;
 
-  this.fixTo = function(obj) {
-    this.constraints.fixedTo.push(obj);
-  };
-
-  this.constraints = {
-    fixedTo: []
-  };
-
-  this.fixTo(this.center);
-  this.fixTo(this.angle.p1);
-  this.fixTo(this.angle.p2);
-  this.center.fixTo(this);
-  this.angle.p1.fixTo(this);
-  this.angle.p2.fixTo(this);
-
-  this.translated = function(vector) {
-    return new Arc(this.angle.translated(vector));
-  }
-  this.getRadius = function() {
-    return this.angle.p1.distanceTo(this.center);
-  }
-
-  this.distanceTo = function(vector) {
-    if (this.angle.inside(vector)) {
-      return Math.abs(vector.distanceTo(this.center) - this.getRadius());
-    }
-    else {
-      return Math.min(vector.distanceTo(this.angle.p1), vector.distanceTo(this.angle.p2));
-    }
-  }
-  this.getLocusIntersection = function(locus) {
-    return locus.getSingleObjIntersection(this);
-  }
-  this.getIntersection = function(obj) {
-    /* m(x - x1) + y = n(x - x2) + b
-    * mx - mx1 + y = nx - nx2 + b
-    * mx - nx = b - nx2 + mx1 - y
-    * x = (b - y + mx1 - nx2) / (m - n)
-    */
-    var objs = [];
-    if (Array.isArray(obj)) {
-      objs = obj.concat([this]);
-      obj = objs[0];
-    }
-    var intersection;
-
-    if (obj.constructor.name === LineSegment.name ||
-      obj.constructor.name === Line.name) {
-        intersection = this.getLineIntersection(obj);
-        // the intersection is a line if the objects are collinear lines
-        if (!intersection) {
-          return undefined;
-        }
-        if (intersection.constructor.name === LineSegment.name ||
-          intersection.constructor.name === Line.name) {
-            if (objs.length > 1) {
-              objs.shift();
-              return this.getIntersection(objs);
-            }
-            else {
-              return obj.clone();
-            }
-        }
-    }
-    if (obj.constructor.name === Arc.name) {
-      intersection = this.getArcIntersection(obj);
-      if (!intersection) {
-        return undefined;
-      }
-    }
-    if (Array.isArray(intersection)) {
-      intersection = intersection.filter(int => objs.every(o => o.containsPoint(int)));
-      if (!intersection.length) {
-        return undefined;
-      }
-      else {
-        intersection = intersection[0];
-      }
-    }
-    if (intersection && objs.some(o => !o.containsPoint(intersection))) {
-      return undefined;
-    }
-    return intersection;
-  }
-  this.getIntersection = function(obj) {
-    if (obj.constructor.name === LineSegment.name ||
-      obj.constructor.name === Line.name) {
-        return this.getLineIntersection(obj);
-    }
-    if (obj.constructor.name === Arc.name) {
-      return this.getLineIntersection(obj);
-    }
-    if (obj.constructor.name === Locus.name) {
-      return this.getLocusIntersection(obj);
-    }
-  };
-  this.getArcIntersection = function(arc) {
-    /*
-      Let d be the distance between centers
-      Let P1 and P2 be the centers
-      Let P3 be the midpoint of the intersections
-      Let segments d1 and d2 be P1P3 and P2P3, respectively
-      Let h be the distance from P3 to either intersection
-
-      d1^2 + h^2 = r1^2
-      d2^2 + h^2 = r2^2
-
-      d = d1 + d2
-      d2 = d - d1
-
-      (d - d1)^2 + h^2 = r2^2
-      d^2 - 2d1d + d1^2 + h^2 = r2^2
-      d^2 - 2d1d = r2^2 - r1^2
-      -2d1d = r2^2 - r1^2 - d^2
-      d1 = (d^2 + r1^2 - r2^2) / (2d)
-
-      h^2 = r1^2 - d1^2
-      h = sqrt(r1^2 - d1^2)
-
-      P3 = P1 + d1(P2 - P1) / d
-
-      x4 = x3 +- h(y2 - y1) / d
-      y4 = y3 +- h(x2 - x1) / d
-      */
-    var c1 = this.center;
-    var c2 = arc.center;
-    var d = c2.distanceTo(c1);
-    var d1 = (sqr(d) + sqr(this.getRadius()) - sqr(arc.getRadius())) / (2 * d);
-
-    var intToIntsMP = Math.sqrt(sqr(this.getRadius()) - sqr(d1));
-    var intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
-
-    var int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
-    var int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
-
-    if (!int1.equals(int2)) {
-      return new Locus([int1, int2]);
-    }
-    else {
-      return int1;
-    }
-  }
-  this.translate = function(vector) {
-    log.broadcast(new Translation(this, vector, {preImage: this}));
-  }
-  this.dilated = function(center, factor) {
-    return new Arc(this.angle.dilated(center, factor));
-  }
-  this.receive = function(transformation) {
-    var existingExclusions = [];
-    if (transformation.args && transformation.args.exclude) {
-      existingExclusions = transformation.args.exclude;
-    }
-    var fixedTo = this.constraints.fixedTo;
-    if (fixedTo.includes(transformation.object)) {
-        if (transformation.object == this.center) {
-          var translation = transformation;
-
-          log.broadcast(new Translation(this, translation.vector,
-            {preImage: this, exclude: existingExclusions.concat([translation.object])}));
-
-        }
-        else {
-          var dilation = transformation;
-          var prevRadius = dilation.getPreImage().distanceTo(this.center);
-          var newRadius = dilation.getImage().distanceTo(this.center);
-          log.broadcast(new Dilation(this, this.center, newRadius / prevRadius,
-            {exclude: existingExclusions.concat([dilation.object]), preImage: this}))
-        }
-    }
-
-  }
-  this.getLineIntersection = function(line) {
-    var distToCenter = line.distanceTo(this.center);
-    if (lessOrEqual(distToCenter, this.getRadius())) {
-      var chordMidpoint = line.extended().pointClosestTo(this.center);
-      var halfChordLength = Math.sqrt(this.getRadius() * this.getRadius() - distToCenter * distToCenter);
-
-      var slopeVector = new Vector(1, line.getSlope()).normalize();
-      var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
-      var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
-      var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
-      if (ints.length == 1) {
-        return ints[0];
-      }
-      else {
-        return new Locus(ints);
-      }
-    }
-    else {
-      return undefined;
-    }
-  }
-  this.containsPoint = function(vector) {
-    return this.angle.inside(vector) && equal(vector.distanceTo(this.center), this.getRadius()) ||
-    vector.equals(this.angle.p1) || vector.equals(this.angle.p2);
-  }
-  this.pointClosestTo = function(vector) {
-    if (this.angle.inside(vector)) {
-      var direction = vector.subtract(this.center).normalize();
-      console.log(direction);
-      return this.center.add(direction.multiply(this.getRadius()));
-    }
-    else {
-      console.log('outside');
-      return vector.getClosest(this.angle.p1, this.angle.p2);
-    }
-  }
-
-  this.clone = function() {
-    return new Arc(this.angle.clone());
-  }
-  this.nameString = function() {
-    if (this.id !== undefined) {
-      return 'Arc ' + this.id;
-    }
-    else {
-      return 'Arc';
-    }
-  }
-  this.detailsString = function() {
-    return `${this.center.detailsString()} r=${this.getRadius()}`
-  }
-  this.toString = function() {
-    return `${this.nameString()} ${this.detailsString()}`;
-  }
-
-  this.fixedTo = function(obj) {
-    return this.constraints.fixedTo.includes(obj);
-  };
-  this.setId = function(id) {
-    this.id = id;
-  };
-  this.draw = function(offset, dilation, color, thickness) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = thickness;
-
-    // ctx.translate(.5, .5);
-    offset = offset || new Vector(0, 0);
-
-    ctx.beginPath();
-    ctx.arc(roundFromZero(this.center.x * dilation + offset.x), roundFromZero(-this.center.y * dilation + offset.y),
-      this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
-    ctx.stroke();
-    // ctx.translate(-.5, -.5);
-  }
-}
-function Angle(p1, vertex, p2) {
-  this.p1 = p1;
-  this.vertex = vertex;
-  this.p2 = p2;
-
-  this.getStartAngle = function() {
-    return this.p1.angle(this.vertex);
-  }
-  this.getEndAngle = function() {
-    return this.p2.angle(this.vertex);
-  }
-  this.toCCW = function(angle) {
-    return (Math.PI * 2 + angle) % (Math.PI * 2);
-  }
-  this.inside = function(vector) {
-    var vectorAngle = vector.rotated(this.vertex, -this.getStartAngle()).angle(this.vertex);
-    return vectorAngle > 0 && vectorAngle < this.getMeasure();
-  }
-  this.getMeasure = function() {
-    return this.toCCW(this.p2.angle(this.vertex) - this.p1.angle(this.vertex));
-  }
-  this.translated = function(vector) {
-    return new Angle(this.p1.translated(vector), this.vertex.translated(vector),
-    this.p2.translated(vector));
-  }
-  this.dilated = function(center, factor) {
-    return new Angle(this.p1.dilated(center, factor),
-    this.vertex.dilated(center, factor), this.p2.dilated(center, factor));
-  }
-  this.clone = function() {
-    return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
-  }
-  this.equals = function(angle) {
-    equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
-  }
-}
-function Vector(x, y) {
-  this.id = undefined;
-  this.x = x;
-  this.y = y;
-
-  this.endpointOf = [];
-
-  this.constraints = {
-    fixedTo: []
-  };
-  this.fixTo = function(obj) {
-    this.constraints.fixedTo.push(obj);
-  };
-  this.fixedTo = function(obj) {
-    return this.constraints.fixedTo.includes(obj);
-  };
-
-  this.setAsEndpoint = function(line) {
-    this.endpointOf.push(line);
-  };
-  this.isEndpointOf = function(line) {
-    return this.endpointOf.includes(line);
-  };
-
-  this.setId = function(id) {
-    this.id = id;
-  };
-
-  this.draw = function(offset, color, dilation, radius) {
-    offset = offset || new Vector(0, 0);
-    ctx.fillStyle = color;
-
-    ctx.beginPath();
-    ctx.arc(roundFromZero(this.x * dilation + offset.x), roundFromZero(-this.y * dilation + offset.y), radius, 0, 2 * Math.PI, true);
-    ctx.fill();
-    ctx.fillText(this.id, roundFromZero(this.x * dilation + offset.x) - settings.pointRadius / 2, roundFromZero(-this.y * dilation + offset.y) - settings.pointRadius / 2 + 14, 20);
-    /*ctx.strokeStyle = "#fb0"
-    ctx.translate(.5, .5);
-    ctx.stroke();
-    ctx.translate(-.5, -.5);*/
-
-  };
-  this.angle = function(center) {
-    var x;
-    var y;
-    if (center) {
-      var relativeVector = this.subtract(center);
-      x = relativeVector.x;
-      y = relativeVector.y;
-    }
-    else {
-      x = this.x;
-      y = this.y;
-    }
-    var refAngle = Math.abs(Math.atan(y / x));
-    var angle = refAngle;
-    if (x < 0 && y > 0) {
-      angle = Math.PI - refAngle;
-    }
-    if (y < 0 && x > 0) {
-      angle = Math.PI * 2 - refAngle;
-    }
-    if (x < 0 && y < 0) {
-      angle = Math.PI + refAngle;
-    }
-    return angle;
-  };
-  this.translate = function(vector, translation) {
-    var image = this.add(vector);
-    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
-
-    // if a parent is trying to translate, let this act as if fixed to its image
-    // instead to prevent a conflict
-    if (translation) {
-      fixedTo = fixedTo.filter(obj => obj !== translation.object);
-      if (!translation.object.fixedTo(this)) {
-        fixedTo.push(translation.getImage());
-      }
-    }
-    if (fixedTo.length) {
-      // try to translate to the closest intersection of all parents
-      // if there is no intersection, then this point can't move anywhere
-      var intersection = new Locus(fixedTo).getSelfIntersection();//fixedTo[0].getIntersection(fixedTo.slice(1));
-      if (intersection) {
-        image = intersection.pointClosestTo(image);
-      }
-      //image = intersection ? image.getClosest(intersection) : this;
-    }
-    var displacement = image.subtract(this);
-    this.setPosition(image);
-    if (translation) {
-      var exclude = [translation.object];
-      if (translation.args && translation.args.exclude) {
-        exclude = exclude.concat(translation.args.exclude);
-      }
-      log.broadcast(new Translation(this, displacement, {exclude: exclude}));
-    }
-    else {
-      log.broadcast(new Translation(this, displacement));
-    }
-  }
-  this.dilate = function(center, factor, dilation) {
-    this.setPosition(this.dilated(center, factor));
-    if (dilation) {
-      var exclude = [dilation.object];
-      if (dilation.args && dilation.args.exclude) {
-        exclude = exclude.concat(dilation.args.exclude);
-      }
-      log.broadcast(new Dilation(this, center, factor, {exclude: exclude}));
-    }
-    else {
-      log.broadcast(new Dilation(this, center, factor));
-    }
-  }
-  this.dilated = function(center, factor) {
-    return this.subtract(center).multiply(factor).add(center);
-  }
-  this.receive = function(transformation) {
-    var fixedTo = this.constraints.fixedTo;
-    if (fixedTo.includes(transformation.object) /*&& !this.received.some(t => t.similarTo(transformation))*/) {
-      if (transformation.name === 'translation') {
-        var translation = transformation;
-        this.translate(translation.vector, translation);
-      }
-      if (transformation.name === 'rotation') {
-        var rotation = transformation;
-        if (!rotation.center.equals(this)) {
-          this.rotate(rotation.center, rotation.radians, rotation);
-        }
-      }
-      if (transformation.name === 'extension') {
-        var extension = transformation;
-        var line = extension.object;
-        var fixedTo = line.constraints.fixedTo;
-        if (!fixedTo.includes(this)) {
-          var endpoint = extension.endpoint;
-          var otherEndpoint = line.endpoints.filter(p => p !== endpoint)[0];
-          console.log(endpoint.toString());
-          console.log(otherEndpoint.toString());
-          // if endpoint passed this point, then move this point back to endpoint
-          if (endpoint.distanceTo(otherEndpoint) < this.distanceTo(otherEndpoint)) {
-            this.translate(endpoint.subtract(this));
-          }
-        }
-      }
-      if (transformation.name === 'dilation') {
-        var dilation = transformation;
-        if (!dilation.center.equals(this)) {
-          this.dilate(transformation.center, transformation.factor, dilation);
-        }
-      }
-    }
-  }
-  this.getClosest = function(locus) {
-    // map each object to its point closest to this, then reduce that array of
-    // points to the closest one
-    return locus.get().map(v => v.pointClosestTo(this)).reduce((closest, cur) =>
-    this.distanceTo(cur) < this.distanceTo(closest) ? cur : closest);
-  }
-  this.pointClosestTo = function(vector) {
-    return this;
-  }
-  this.distanceTo = function(vector) {
-    return vector.subtract(this).magnitude();
-  }
-  this.update = function() {
-    if (selections.isSelected(this)) {
-      ui.updateVectorProps(this);
-    }
-    ui.addObject("Line Segment ", this);
-  }
-  this.setPosition = function(vector, callers) {
-    if (callers) {
-      var initial = this.clone();
-      this.parents.forEach(p => {
-        if (callers.includes(p)) {
-          this.x = vector.x;
-          this.y = vector.y;
-        }
-        else {
-          this.x = initial.x;
-          this.y = initial.y;
-          callers.push(this);
-          p.shift(vector.subtract(this), callers);
-        }
-      });
-    }
-    else {
-      this.x = vector.x;
-      this.y = vector.y;
-    }
-  }
-  this.rotate = function(center, radians, rotation) {
-    this.setPosition(this.rotated(center, radians));
-    if (rotation) {
-      var exclude = [rotation.object];
-      if (rotation.args && rotation.args.exclude) {
-        exclude = exclude.concat(rotation.args.exclude);
-      }
-      log.broadcast(new Rotation(this, center, radians, {exclude: exclude}));
-    }
-    else {
-      log.broadcast(new Rotation(this, center, radians));
-    }
-  }
-  this.rotated = function(center, radians) {
-    var relativeVector = this.subtract(center);
-    var angleSum = relativeVector.angle() + radians;
-    if (!isNaN(angleSum)) {
-      return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
-    }
-    return this;
-  }
-  this.translated = function(vector) {
-    return this.add(vector);
-  }
-  this.add = function(vector) {
-    return new Vector(this.x + vector.x, this.y + vector.y);
-  }
-  this.subtract = function(vector) {
-    return new Vector(this.x - vector.x, this.y - vector.y);
-  }
-  this.multiply = function(scalar) {
-    return new Vector(this.x * scalar, this.y * scalar);
-  }
-  this.normal = function(CW) {
-    if (CW) {
-      return new Vector(this.y, -this.x);
-    }
-    return new Vector(-this.y, this.x);
-  }
-  this.divide = function(scalar) {
-    return new Vector(this.x / scalar, this.y / scalar);
-  }
-  this.normalize = function() {
-    return new Vector(this.x / this.magnitude(), this.y / this.magnitude());
-  }
-  this.floorTowardZero = function() {
-    return new Vector(floorTowardZero(this.x), floorTowardZero(this.y));
-  }
-  this.roundFromZero = function(dPlaces) {
-    return new Vector(roundFromZero(this.x, dPlaces), roundFromZero(this.y, dPlaces));
-  }
-  this.negative = function() {
-    return new Vector(-this.x, -this.y);
-  }
-  this.magnitude = function() {
-    return Math.sqrt(this.x * this.x + this.y * this.y);
-  }
-  this.equals = function(vector) {
-    return equal(this.x, vector.x) && equal(this.y, vector.y);
-  }
-  this.clone = function(id) {
-    var clone = new Vector(this.x, this.y);
-    clone.setId(id);
-    return clone;
-  }
-  this.nameString = function() {
-    if (this.id !== undefined) {
-      return 'Vector ' + this.id;
-    }
-    else {
-      return 'Vector';
-    }
-  }
-  this.detailsString = function() {
-    return `\(${roundFromZero(this.x, 2)}, ${roundFromZero(this.y, 2)}\)`
-  }
-  this.toString = function() {
-    return `${this.nameString()} ${this.detailsString()}`;
-  }
-}
-function LineSegment(p1, p2) {
-  this.id = undefined;
-  this.p1 = p1;
-  this.p2 = p2;
-
-  this.endpoints = [];
-  this.setEndpoint = function(vector) {
-    this.endpoints.push(vector);
-    this.fixTo(vector);
-    vector.fixTo(this);
-  };
-  this.hasEndpoint = function(vector) {
-    return this.endpoints.includes(vector);
-  };
-
-  this.constraints = {
-    fixedTo: []
-  };
-  this.fixTo = function(obj) {
-    this.constraints.fixedTo.push(obj);
-  };
-  this.fixedTo = function(obj) {
-    return this.constraints.fixedTo.includes(obj);
-  };
-
-  this.setEndpoint(p1);
-  this.setEndpoint(p2);
-
-  this.setId = function(id) {
-    this.id = id;
-  };
-  this.yInt = function() {
-    return this.extended().getY(0);
-  };
-  this.midpoint = function() {
-    return this.p1.add(this.p2).divide(2);
-  };
-  this.receive = function(transformation) {
-    var fixedTo = this.constraints.fixedTo;
-    if (fixedTo.includes(transformation.object)) {
-        var translation = transformation;
-
-        // p1 isn't the translated vector; p2 is the translated vector before translation
-        var preImagePoint = translation.getPreImage();
-        var otherEndpoint = [this.p1, this.p2].filter(p => p !== translation.object)[0].clone();
-        var preImageMidpoint = new LineSegment(otherEndpoint, preImagePoint).midpoint();
-
-        // the rotation center will be the reflection of the preimage translated point in the midpoint
-        var vectorToMidpoint = preImagePoint.subtract(preImageMidpoint);
-        var center = preImageMidpoint.subtract(vectorToMidpoint);
-
-        var oldAngle = preImagePoint.angle(otherEndpoint);
-        var newAngle = translation.getImage().angle(otherEndpoint);
-        var angle = newAngle - oldAngle;
-
-        var existingExclusions = [];
-        if (transformation.args && transformation.args.exclude) {
-          existingExclusions = transformation.args.exclude;
-        }
-        var rotation = new Rotation(this, center, angle, {exclude: [translation.object].concat(existingExclusions), preImage: this});
-        var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
-        var endpoint = translation.getPreImage().rotated(center, angle);
-        //var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
-        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object].concat(existingExclusions), preImage: this});
-
-        log.broadcast(rotation);
-        log.broadcast(dilation);
-        //log.broadcast(extension);
-    }
-  };
-  this.translated = function(vector) {
-    return new LineSegment(this.p1.translated(vector), this.p2.translated(vector));
-  };
-  this.extended = function(endpoint, distance) {
-    if (arguments.length === 0) {
-      return new Line(this.p1.clone(), this.p2.clone());
-    }
-    var otherEndpoint = [this.p1, this.p2].filter(p => p !== endpoint)[0];
-    var slopeVector = endpoint.subtract(otherEndpoint).normalize();
-    var translation = slopeVector.multiply(distance);
-
-    var p1, p2;
-    if (this.p1 === endpoint) {
-      p1 = endpoint.add(translation);
-      p2 = otherEndpoint.clone();
-    }
-    else {
-      p1 = otherEndpoint.clone();
-      p2 = endpoint.add(translation);
-    }
-    return new LineSegment(p1, p2);
-  };
-  this.rotated = function(center, radians) {
-    var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
-    return new LineSegment(endpoints[0], endpoints[1]);
-  };
-  this.dilated = function(center, factor) {
-    return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
-  };
-  this.addVector = function(vector) {
-    this.children.push(vector);
-    vector.addParent(this);
-    this.update();
-  };
-  this.removePoint = function(vector) {
-    this.children.splice(this.children.indexOf(vector), 1);
-    vector.removeParent(this);
-  };
-  this.onLine = function(vector) {
-    return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
-  };
-  this.update = function() {
-    this.children.forEach(c => {
-      c.update();
-    });
-    if (selections.isSelected(this)) {
-      ui.updateLineProps(this);
-    }
-  };
-  this.translate = function(vector) {
-    log.broadcast(new Translation(this, vector, {preImage: this}));
-  };
-  this.getX = function(y) {
-    if (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y) {
-      return (y - this.p1.y) / this.getSlope() + this.p1.x;
-    }
-    return undefined;
-  };
-  this.getY = function(x) {
-    if (x >= this.p1.x && x <= this.p2.x || x <= this.p1.x && x >= this.p2.x) {
-      return this.getSlope() * (x - this.p1.x) + this.p1.y;
-    }
-    return undefined;
-  };
-  this.perpThrough = function(vector) {
-    var perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
-
-    if (this.getLineIntersection(perp)) {
-      return perp;
-    }
-    return undefined;
-  };
-  this.distanceTo = function(vector) {
-    var perp = this.perpThrough(vector);
-    if (perp) {
-      return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
-    }
-    else {
-      return Math.min(vector.subtract(this.p1).magnitude(), vector.subtract(this.p2).magnitude());
-    }
-  };
-  this.pointClosestTo = function(vector) {
-    var perp = this.perpThrough(vector);
-    if (perp) {
-      return this.getLineIntersection(this.perpThrough(vector));
-    }
-    else {
-      return vector.subtract(this.p2).magnitude() < vector.subtract(this.p1).magnitude() ? this.p2 : this.p1;
-    }
-  };
-  this.draw = function(offset, color, dilation, thickness) {
-    ctx.lineWidth = thickness;
-
-    ctx.translate(.5, .5);
-    offset = offset || new Vector(0, 0);
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(roundFromZero(this.p1.x * dilation + offset.x), roundFromZero(-this.p1.y * dilation + offset.y));
-    ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
-    ctx.stroke();
-    ctx.translate(-.5, -.5);
-  };
-  this.getSlope = function() {
-    return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
-  };
-  this.containsPoint = function(vector) {
-    return this.onLine(vector);
-  }
-  this.getLineIntersection = function(line) {
-    /* m(x - x1) + y = n(x - x2) + b
-    * mx - mx1 + y = nx - nx2 + b
-    * mx - nx = b - nx2 + mx1 - y
-    * x = (b - y + mx1 - nx2) / (m - n)
-    */
-    if (this.getSlope() !== line.getSlope()) {
-      var x;
-      if (Math.abs(this.getSlope()) === Infinity) {
-        x = this.p1.x;
-        var y = line.getY(x);
-
-        if (y != undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          return new Vector(x, y);
-        }
-      }
-      else if (Math.abs(line.getSlope()) === Infinity) {
-        x = line.p1.x;
-        var y = this.getY(x);
-
-        if (y !== undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
-          return new Vector(x, y);
-        }
-      }
-      else {
-        x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
-        if (this.getY(x) !== undefined && line.getY(x) !== undefined) {
-          return new Vector(x, this.getY(x));
-        }
-      }
-    }
-    // if the line(segment)s are (on) the same line, their intersection is a line(segment)
-    else if (this.equals(line)) {
-      return this.clone();
-    }
-  }
-  this.getIntersection = function(obj) {
-    if (obj.constructor.name === LineSegment.name ||
-      obj.constructor.name === Line.name) {
-        return this.getLineIntersection(obj);
-    }
-    if (obj.constructor.name === Arc.name) {
-      return this.getLineIntersection(obj);
-    }
-    if (obj.constructor.name === Locus.name) {
-      return this.getLocusIntersection(obj);
-    }
-  };
-  this.getArcIntersection = function(arc) {
-    return arc.getLineIntersection(this);
-  }
-  this.getLocusIntersection = function(locus) {
-    return locus.getSingleObjIntersection(this);
-  }
-  this.equals = function(line) {
-    return this.p1.equals(line.p1) && this.p2.equals(line.p2);
-  };
-  this.clone = function() {
-    return new LineSegment(this.p1.clone(), this.p2.clone());
-  };
-  this.length = function() {
-    return p2.subtract(p1).magnitude();
-  };
-  this.nameString = function() {
-    if (this.id !== undefined) {
-      return 'Line Segment ' + this.id;
-    }
-    else {
-      return 'Line Segment';
-    }
-  };
-  this.detailsString = function() {
-    return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
-  };
-  this.toString = function() {
-    return `${this.nameString()} ${this.detailsString()}`
-  };
-}
-function Line(p1, p2?) {
-  this.id = undefined;
-  if (!p2) {
-    var args = p1;
-    if (args.slope !== undefined && args.p !== undefined) {
-      this.p1 = args.p;
-      this.p2 = args.p.add(new Vector(1, args.slope));
-    }
-  }
-  else {
-    this.p1 = p1;
-    this.p2 = p2;
-  }
-  this.setId = function(id) {
-    this.id = id;
-  }
-  this.constraints = {
-    fixedTo: [],
-  };
-  this.fixTo = function(obj) {
-    this.constraints.fixedTo.push(obj);
-  }
-  this.fixedTo = function(obj) {
-    return this.constraints.fixedTo.includes(obj);
-  };
-  this.p1.fixTo(this);
-  this.p2.fixTo(this);
-  this.fixTo(this.p1);
-  this.fixTo(this.p2);
-
-  this.receive = function() {
-
-  }
-  /*this.dilate = function(factor) {
-    this.p1 = this.p1.multiply(factor);
-    this.p2 = this.p2.multiply(factor);
-  }
-  this.translate = function(vector) {
-    return new LineSegment(this.p1.add(vector), this.p2.add(vector));
-  }*/
-  this.translate = function(vector) {
-    log.broadcast(new Translation(this, vector, {preImage: this}));
-  }
-  this.translated = function(vector) {
-    return new Line(this.p1.translated(vector), this.p2.translated(vector));
-  }
-  this.midpoint = function() {
-    return this.p1.add(this.p2).divide(2);
-  }
-  this.getX = function(y) {
-    if (Math.abs(this.getSlope()) === Infinity) {
-      return this.p1.x;
-    }
-    if (this.getSlope() === 0) {
-      return undefined;
-    }
-    return (y - this.p1.y) / this.getSlope() + this.p1.x;
-  }
-  this.containsPoint = function(vector) {
-    return this.onLine(vector);
-  }
-  this.getY = function(x) {
-    if (Math.abs(this.getSlope()) === Infinity) {
-      return undefined;
-    }
-    if (this.getSlope() === 0) {
-      return this.p1.y;
-    }
-    return this.getSlope() * (x - this.p1.x) + this.p1.y;
-  }
-  this.onLine = function(vector) {
-    return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
-  }
-  this.perpThrough = function(vector) {
-    return new Line({slope: -1 / this.getSlope(), p: vector.clone()});
-  }
-  this.distanceTo = function(vector) {
-    return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
-    //return vector.subtract(this.getIntersection(this.perpThrough(vector)).point()).magnitude();
-
-  }
-  this.pointClosestTo = function(vector) {
-    return this.getLineIntersection(this.perpThrough(vector));
-    // return this.getIntersection(this.perpThrough(vector)).point();
-  }
-
-  this.draw = function(offset, color, dilation, thickness) {
-    ctx.lineWidth = thickness;
-
-    ctx.translate(.5, .5);
-    offset = offset || new Vector(0, 0);
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(roundFromZero(this.p1.x * dilation + offset.x), roundFromZero(-this.p1.y * dilation + offset.y));
-    ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
-    ctx.stroke();
-    ctx.translate(-.5, -.5);
-  }
-  this.getSlope = function() {
-    return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
-  }
-  this.getLineIntersection = function(line) {
-    var x;
-    if (this.getSlope() != line.getSlope()) {
-      // handle vertical lines
-      if (Math.abs(this.getSlope()) == Infinity) {
-        x = this.p1.x;
-        var y = line.getY(x);
-
-        if (y != undefined) {
-          return new Vector(x, y);
-        }
-      }
-      else if (Math.abs(line.getSlope()) == Infinity) {
-        x = line.p1.x;
-        var y = this.getY(x);
-
-        if (y >= line.p1.y && y <= line.p2.y || y <= line.p1.y && y >= line.p2.y) {
-          return new Vector(x, y);
-        }
-      }
-      else {
-        x = (line.p1.y - this.p1.y + this.getSlope() * this.p1.x - line.getSlope() * line.p1.x) / (this.getSlope() - line.getSlope());
-        if (this.getY(x) != undefined && line.getY(x) != undefined) {
-          return new Vector(x, this.getY(x));
-        }
-      }
-    }
-    else if (this.equals(line)) {
-      return line.clone();
-    }
-  }
-  this.getIntersection = function(obj) {
-    /* m(x - x1) + y = n(x - x2) + b
-    * mx - mx1 + y = nx - nx2 + b
-    * mx - nx = b - nx2 + mx1 - y
-    * x = (b - y + mx1 - nx2) / (m - n)
-    */
-    /*var objs = [];
-    if (Array.isArray(obj)) {
-      objs = obj.concat([this]);
-      obj = objs[0];
-    }
-    var intersection;
-
-    if (obj.constructor.name === LineSegment.name ||
-      obj.constructor.name === Line.name) {
-        intersection = this.getLineIntersection(obj);
-        // the intersection is a line if the objects are collinear lines
-        if (!intersection) {
-          return undefined;
-        }
-        if (intersection.constructor.name === LineSegment.name ||
-          intersection.constructor.name === Line.name) {
-            if (objs.length > 1) {
-              objs.shift();
-              return this.getIntersection(objs);
-            }
-            else {
-              return obj.clone();
-            }
-        }
-    }
-    if (obj.constructor.name === Arc.name) {
-      intersection = obj.getLineIntersection(this);
-      if (!intersection) {
-        return undefined;
-      }
-    }
-    if (obj.constructor.name === Locus.name) {
-      intersection = obj.getSingleObjIntersection(this).get();
-    }
-    if (Array.isArray(intersection)) {
-      intersection = intersection.filter(int => objs.every(o => o.containsPoint(int)));
-      if (!intersection.length) {
-        return undefined;
-      }
-      else {
-        intersection = intersection[0];
-      }
-    }
-    if (intersection && objs.some(o => !o.containsPoint(intersection))) {
-      return undefined;
-    }*/
-
-      if (obj.constructor.name === LineSegment.name ||
-        obj.constructor.name === Line.name) {
-          return this.getLineIntersection(obj);
-      }
-      if (obj.constructor.name === Arc.name) {
-        return this.getLineIntersection(obj);
-      }
-      if (obj.constructor.name === Locus.name) {
-        return this.getLocusIntersection(obj);
-      }
-    //return intersection;
-  }
-  this.getArcIntersection = function(arc) {
-    return arc.getLineIntersection(this);
-  }
-  this.equals = function(line) {
-    return this.p1.equals(line.p1) && this.p2.equals(line.p2) || this.p1.equals(line.p2) && this.p2.equals(line.p1);
-  }
-  this.clone = function() {
-    return new Line(this.p1.clone(), this.p2.clone());
-  }
-  this.extended = function() {
-    return this.clone();
-  }
-  this.length = function() {
-    return Infinity;
-  }
-  this.nameString = function() {
-    if (this.id !== undefined) {
-      return 'Line ' + this.id;
-    }
-    else {
-      return 'Line ';
-    }
-  }
-  this.detailsString = function() {
-    return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
-  }
-  this.toString = function() {
-    return `${this.nameString()} ${this.detailsString()}`
-  }
-}
 function Locus(set) {
   this.set = set || [];
 
