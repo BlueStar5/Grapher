@@ -277,26 +277,55 @@ var commands = {
             cam.translate(new Vector(-mouse.deltaX, -mouse.deltaY));
         }
     },
-    line: function (mouse) {
-        if (settings.mode === 'line') {
-            // store vector temporarily
+    segment: function (mouse, keys) {
+        if (settings.mode === 'segment') {
             var vector = commands.getVectorFromMouse(mouse);
             plane.addTempVector(vector);
-            // create line when both vectors are available
-            if (plane.tempVectors.length === 2) {
-                // if the two vectors are equal, create the vector instead
-                if (plane.tempVectors[1].subtract(plane.tempVectors[0]).magnitude() === 0) {
-                    plane.addVector(plane.tempVectors[0]);
-                    ui.addObject("Vector ", plane.tempVectors[0]);
+            var command = log.getLastCommand();
+            if (!command || command.constructor.name !== SegmentCreation.name || command.finished) {
+                command = new SegmentCreation();
+                log.logCommand(command);
+            }
+            command.addArg(vector);
+            if (!keys.shift) {
+                if (command.argsFilled()) {
+                    command.execute();
+                    if (keys.control) {
+                        command = new SegmentCreation();
+                        command.addArg(vector);
+                        command.nextArg();
+                        log.logCommand(command);
+                    }
                 }
                 else {
-                    var line = new Line(plane.tempVectors[0], plane.tempVectors[1]);
-                    plane.tempVectors.forEach(v => plane.addVector(v));
-                    plane.addLine(line);
-                    ui.addObject("Line ", line);
+                    command.nextArg();
                 }
-                // clear temp vector storage
-                plane.tempVectors.splice(0);
+            }
+        }
+    },
+    line: function (mouse, keys) {
+        if (settings.mode === 'line') {
+            var vector = commands.getVectorFromMouse(mouse);
+            plane.addTempVector(vector);
+            var command = log.getLastCommand();
+            if (!command || command.constructor.name !== LineCreation.name || command.finished) {
+                command = new LineCreation();
+                log.logCommand(command);
+            }
+            command.addArg(vector);
+            if (!keys.shift) {
+                if (command.argsFilled()) {
+                    command.execute();
+                    if (keys.control) {
+                        command = new LineCreation();
+                        command.addArg(vector);
+                        command.nextArg();
+                        log.logCommand(command);
+                    }
+                }
+                else {
+                    command.nextArg();
+                }
             }
         }
     },
@@ -365,14 +394,14 @@ var commands = {
             }*/
         }
     },
-    segment: function (mouse, keys) {
-        if (settings.mode === 'segment') {
-            // store vector temporarily
-            var vector = commands.getVectorFromMouse(mouse);
+    arc: function (mouse, keys) {
+        if (settings.mode === 'arc') {
+            //
+            let vector = commands.getVectorFromMouse(mouse);
             plane.addTempVector(vector);
-            var command = log.getLastCommand();
-            if (!command || command.constructor.name !== SegmentCreation.name || command.finished) {
-                command = new SegmentCreation();
+            let command = log.getLastCommand();
+            if (!command || command.constructor.name !== ArcCreation.name || command.finished) {
+                command = new ArcCreation();
                 log.logCommand(command);
             }
             command.addArg(vector);
@@ -380,7 +409,7 @@ var commands = {
                 if (command.argsFilled()) {
                     command.execute();
                     if (keys.control) {
-                        command = new SegmentCreation();
+                        command = new ArcCreation();
                         command.addArg(vector);
                         command.nextArg();
                         log.logCommand(command);
@@ -390,48 +419,24 @@ var commands = {
                     command.nextArg();
                 }
             }
-            /*
-            if (!keys.shift) {
-              if (!selections.segmentSelections[0].length) {
-                selections.addSegmentSelection(vector);
-                selections.segmentSelectionNo++;
-              }
-              else {
-                selections.segmentSelectionNo = 1;
-                selections.addSegmentSelection(vector);
-                selections.segmentSelectionNo = 0;
-                selections.segmentSelections[0].forEach(p1 => {
-                  selections.segmentSelections[1].forEach(p2 => {
-                    plane.addVector(p2);
-                    plane.addLine(new LineSegment(p1, p2));
-                  });
-                  plane.addVector(p1);
-                });
-                selections.segmentSelections.forEach(selection => selection.length = 0);
-                plane.tempVectors.splice(0);
-              }
-            }
-            else {
-              selections.addSegmentSelection(vector);
-            }*/
-        }
-    },
-    arc: function (mouse) {
-        if (settings.mode === 'arc') {
-            var vector = commands.getVectorFromMouse(mouse);
-            if (plane.tempVectors.length === 2) {
-                // constrain second vector to arc's radius
-                var radius = plane.tempVectors[1].distanceTo(plane.tempVectors[0]);
-                vector = vector.subtract(plane.tempVectors[0]).normalize().multiply(radius).add(plane.tempVectors[0]);
+            console.log(command); //
+            //var vector = commands.getVectorFromMouse(mouse);
+            /*if (plane.tempVectors.length === 2) {
+              // constrain second vector to arc's radius
+              var radius = plane.tempVectors[1].distanceTo(plane.tempVectors[0]);
+              vector = vector.subtract(plane.tempVectors[0]).normalize().multiply(radius).add(plane.tempVectors[0]);
             }
             plane.addTempVector(vector);
+      
             if (plane.tempVectors.length === 3) {
-                var ang = new Angle(plane.tempVectors[1], plane.tempVectors[0], plane.tempVectors[2]);
-                var arc = new Arc(ang);
-                plane.tempVectors.forEach(v => plane.addVector(v));
-                plane.addArc(arc);
-                plane.tempVectors.splice(0);
-            }
+              var ang = new Angle(plane.tempVectors[1], plane.tempVectors[0], plane.tempVectors[2]);
+              var arc = new Arc(ang);
+      
+              plane.tempVectors.forEach(v => plane.addVector(v));
+              plane.addArc(arc);
+      
+              plane.tempVectors.splice(0);
+            }*/
         }
     },
     fix: function (mouse) {
@@ -1453,6 +1458,91 @@ class Line extends LinearObject {
         return `${this.nameString()} ${this.detailsString()}`;
     }
 }
+class Creation {
+    constructor() {
+        this.currentArg = 0;
+        this.finished = false;
+    }
+    addArg(arg) {
+        this.args[this.currentArg].push(arg);
+    }
+    nextArg() {
+        if (this.currentArg === this.args.length - 1) {
+            this.currentArg = 0;
+        }
+        else {
+            this.currentArg++;
+        }
+    }
+    argsFilled() {
+        return this.args.every(arg => arg.length);
+    }
+    execute() {
+        this.finished = true;
+    }
+}
+class SegmentCreation extends Creation {
+    constructor() {
+        super();
+        this.args = [[], []];
+    }
+    execute() {
+        this.args[0].forEach(p1 => {
+            plane.removeTempVector(p1);
+            plane.addVector(p1);
+            this.args[1].forEach(p2 => {
+                plane.removeTempVector(p2);
+                plane.addVector(p2);
+                plane.addLine(new LineSegment(p1, p2));
+            });
+        });
+        super.execute();
+    }
+    ;
+}
+class LineCreation extends Creation {
+    constructor() {
+        super();
+        this.args = [[], []];
+    }
+    execute() {
+        this.args[0].forEach(p1 => {
+            plane.removeTempVector(p1);
+            plane.addVector(p1);
+            this.args[1].forEach(p2 => {
+                plane.removeTempVector(p2);
+                plane.addVector(p2);
+                plane.addLine(new Line(p1, p2));
+            });
+        });
+        super.execute();
+    }
+    ;
+}
+class ArcCreation extends Creation {
+    constructor() {
+        super();
+        this.args = [[], [], []];
+    }
+    execute() {
+        this.args[0].forEach(center => {
+            plane.removeTempVector(center);
+            plane.addVector(center);
+            this.args[1].forEach(p1 => {
+                plane.removeTempVector(p1);
+                plane.addVector(p1);
+                this.args[2].forEach(p2 => {
+                    plane.removeTempVector(p2);
+                    // constrain second point to radius
+                    p2 = p2.subtract(center).normalize().multiply(p1.distanceTo(center)).add(center);
+                    plane.addVector(p2);
+                    plane.addArc(new Arc(new Angle(p1, center, p2)));
+                });
+            });
+        });
+        super.execute();
+    }
+}
 ui.init();
 var ctx = ui.canvas.getContext('2d');
 ctx.strokeStyle = '#99ff00';
@@ -1482,33 +1572,6 @@ plane.addVector(new Vector(50, 0));
 plane.addVector(new Vector(0, 0));
 plane.addVector(new Vector(0, 50));
 cam.update();
-function SegmentCreation() {
-    this.args = [[], []];
-    this.currentArg = 0;
-    this.finished = false;
-    this.addArg = function (arg) {
-        this.args[this.currentArg].push(arg);
-        plane.addTempVector(arg);
-    };
-    this.nextArg = function () {
-        this.currentArg = 1 - this.currentArg;
-    };
-    this.argsFilled = function () {
-        return this.args.every(arg => arg.length);
-    };
-    this.execute = function () {
-        this.args[0].forEach(p1 => {
-            plane.removeTempVector(p1);
-            plane.addVector(p1);
-            this.args[1].forEach(p2 => {
-                plane.removeTempVector(p2);
-                plane.addVector(p2);
-                plane.addLine(new LineSegment(p1, p2));
-            });
-        });
-        this.finished = true;
-    };
-}
 function Translation(object, vector, args) {
     this.id = 0;
     this.name = 'translation';
@@ -2009,8 +2072,8 @@ mouse.onDown(commands.select, 0, [keyboard.keys]);
 mouse.onMove(commands.move, 0);
 mouse.onDown(commands.vector, 1);
 mouse.onDown(commands.segment, 1, [keyboard.keys]);
-mouse.onDown(commands.line, 1);
-mouse.onDown(commands.arc, 1);
+mouse.onDown(commands.line, 1, [keyboard.keys]);
+mouse.onDown(commands.arc, 1, [keyboard.keys]);
 mouse.onDown(commands.fix, 1);
 mouse.onMove(cam.update.bind(cam), 2);
 mouse.onDown(cam.update.bind(cam), 2);
