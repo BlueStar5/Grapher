@@ -1633,15 +1633,81 @@ plane.addVector(new Vector(0, 0));
 plane.addVector(new Vector(0, 50));
 
 cam.update();
-function Translation(object, vector, args?) {
+abstract class Transformation {
+  id = 0;
+  name: string;
+  object: GeomObject;
+  preImage: GeomObject;
+  image: GeomObject;
+  exclude: GeomObject[];
+  constructor(object: GeomObject, args?: {exclude?: GeomObject[], preImage?: GeomObject, image?: GeomObject}) {
+    this.object = object;
+    if (args) {
+      this.exclude = args.exclude;
+      this.preImage = args.preImage;
+      this.image = args.image;
+    }
+  }
+}
+class Translation extends Transformation {
+  vector: Vector;
+  constructor(object: GeomObject, vector: Vector, args?: {exclude?: GeomObject[], preImage?: GeomObject, image?: GeomObject}) {
+    super(object, args);
+    this.name = "translation";
+    this.vector = vector;
+    if (this.preImage) {
+      this.image = this.preImage.translated(vector);
+    }
+    else if (this.image) {
+      this.preImage = this.image.translated(vector.negative());
+    }
+    else {
+      this.preImage = this.object.translated(vector.negative());
+      this.image = this.object.clone();
+    }
+  }
+  getPreImage() {
+    return this.preImage || (this.image ? this.image.translated(this.vector.negative()) : null) || this.object.translated(this.vector.negative());
+  }
+  getImage() {
+    return this.image || (this.preImage ? this.preImage.translated(this.vector) : null) || this.object.clone();
+  }
+  toString() {
+    if (settings.detailedConsole) {
+      return `${this.object.nameString()} ${this.getPreImage().detailsString()} has been translated ${this.vector.detailsString()} to ${this.getImage().detailsString()}.`;
+    }
+    else {
+      return `${this.object.nameString()} has been translated.`;
+    }
+  }
+  equals(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.vector.equals(transformation.vector);
+  }
+  similarTo(transformation) {
+    return this.id === transformation.id && this.name === transformation.name;
+  }
+}
+function _Translation(object, vector, args?) {
   this.id = 0;
   this.name = 'translation';
   this.object = object;
   this.vector = vector;
   if (args) {
     this.exclude = args.exclude;
-    this.preImage = args.preImage ? args.preImage.clone() : undefined;
-    this.image = args.image ? args.image.clone() : undefined;
+    if (args.preImage) {
+      this.preImage = args.preImage;
+      this.image = this.preImage.translated(vector);
+    }
+    else if (args.image) {
+      this.image = args.image;
+      this.preImage = this.image.translated(vector.negative());
+    }
+    else {
+      this.preImage = this.object.translated(vector.negative());
+      this.image = this.object.clone();
+    }
+    /*this.preImage = args.preImage ? args.preImage.clone() : undefined;
+    this.image = args.image ? args.image.clone() : undefined;*/
   }
   this.getPreImage = function() {
     return this.preImage || (this.image ? this.image.translated(vector.negative()) : null) || this.object.translated(vector.negative());
@@ -1671,7 +1737,51 @@ function Translation(object, vector, args?) {
     return this.receivers.includes(object);
   }*/
 }
-function Rotation(object, center, radians, args?) {
+class Rotation extends Transformation {
+  center: Vector;
+  radians: number;
+  constructor(object, center, radians, args?) {
+    super(object, args);
+    this.name = "rotation";
+    this.center = center;
+    this.radians = radians;
+    if (this.preImage) {
+      this.image = this.preImage.rotated(this.center, this.radians);
+    }
+    else if (this.image) {
+      this.preImage = this.image.rotated(this.center, -this.radians);
+    }
+    else {
+      this.preImage = this.object.rotated(this.center, -this.radians);
+      this.image = this.object.clone();
+    }
+  }
+  getPreImage() {
+    return this.preImage || (this.image ? this.image.rotated(this.center, -this.radians) : null) || this.object.rotated(this.center, -this.radians);
+  }
+  getImage() {
+    return this.image || (this.preImage ? this.preImage.rotated(this.center, this.radians) : null) || this.object.clone();
+  }
+  toString() {
+    if (settings.detailedConsole) {
+      return `${this.object.nameString()} ${this.getPreImage().detailsString()} has been rotated ${this.radians} radians about ${this.center.detailsString()} to ${this.getImage().detailsString()}.`;
+    }
+    else {
+      return `${this.object.nameString()} has been rotated.`
+    }
+  }
+  // this.receivers = [];
+  // this.addReceiver(object) {
+  //   this.receivers.push(object);
+  // }
+  equals(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.radians === transformation.radians;
+  }
+  similarTo(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
+  }
+}
+function _Rotation(object, center, radians, args?) {
   this.id = 0;
   this.name = 'rotation';
   this.object = object;
@@ -1749,7 +1859,47 @@ function Extension(object, endpoint, distance, args?) {
   //   return this.receivers.includes(object);
   // }
 }
-function Dilation(object, center, factor, args?) {
+class Dilation extends Transformation {
+  center: Vector;
+  factor: number;
+  constructor(object, center, factor, args?) {
+    super(object, args);
+    this.name = "rotation";
+    this.center = center;
+    this.factor = factor;
+    if (this.preImage) {
+      this.image = this.preImage.dilated(this.center, this.factor);
+    }
+    else if (this.image) {
+      this.preImage = this.image.dilated(this.center, 1 / this.factor);
+    }
+    else {
+      this.preImage = this.object.dilated(this.center, 1 / this.factor);
+      this.image = this.object.clone();
+    }
+  }
+  getPreImage() {
+    return this.preImage || (this.image ? this.image.dilated(this.center, 1 / this.factor) : null) || this.object.dilated(this.center, 1 / this.factor);
+  }
+  getImage() {
+    return this.image || (this.preImage ? this.preImage.dilated(this.center, this.factor) : null) || this.object.clone();
+  }
+  toString() {
+    if (settings.detailedConsole) {
+      return `${this.object.nameString()} ${this.getPreImage().detailsString()} has been dilated ${this.factor}x about ${this.center.detailsString()} to ${this.getImage().detailsString()}.`
+    }
+    else {
+      return `${this.object.nameString()} has been dilated.`
+    }
+  }
+  equals(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.factor === transformation.factor;
+  }
+  similarTo(transformation) {
+    return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
+  }
+}
+function _Dilation(object, center, factor, args?) {
   this.id = 0;
   this.name = 'dilation';
   this.object = object;
