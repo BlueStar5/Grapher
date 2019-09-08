@@ -494,6 +494,7 @@ var log = {
   objectCommands: 0
 };
 abstract class GeomObject {
+  abstract getIntersection(object: GeomObject): GeomObject;
   id: number;
   constructor() {
     this.id = undefined;
@@ -523,11 +524,12 @@ abstract class GeomObject {
   abstract toString(): string;
   abstract draw(offset: Vector, dilation: number, color: string,
     thickness: number): void;
+  abstract equals(object: GeomObject): boolean;
 }
 abstract class DimensionalObject extends GeomObject {
   abstract getLineIntersection(line: GeomObject): GeomObject;
   abstract getArcIntersection(arc: Arc): GeomObject;
-  abstract getLocusIntersection(locus: typeof Locus): GeomObject;
+  abstract getLocusIntersection(locus: Locus): GeomObject;
   abstract getIntersection(obj: GeomObject): GeomObject;
   abstract containsPoint(point: Vector): boolean;
 }
@@ -558,10 +560,13 @@ abstract class LinearObject extends DimensionalObject {
   abstract onLine(point: Vector): boolean;
   abstract getX(y: number): number;
   abstract getY(x: number): number;
-  abstract perpThrough(point: Vector): LinearObject;
+  abstract perpThrough(vector: Vector): LinearObject;
   abstract getSlope(): number;
 }
 class Arc extends DimensionalObject {
+  equals(object: GeomObject): boolean {
+    throw new Error("Method not implemented.");
+  }
   rotated(center: Vector, angle: number): GeomObject {
     throw new Error("Method not implemented.");
   }
@@ -759,6 +764,9 @@ class Arc extends DimensionalObject {
   }
 }
 class Angle extends GeomObject {
+  getIntersection(object: GeomObject): GeomObject {
+    throw new Error("Method not implemented.");
+  }
   translate(vector: Vector): void {
     throw new Error("Method not implemented.");
   }
@@ -806,7 +814,7 @@ class Angle extends GeomObject {
   getMeasure() {
     return this.toCCW(this.p2.angle(this.vertex) - this.p1.angle(this.vertex));
   }
-  translated(vector) {
+  translated(vector: Vector): Angle {
     return new Angle(this.p1.translated(vector), this.vertex.translated(vector),
     this.p2.translated(vector));
   }
@@ -817,11 +825,14 @@ class Angle extends GeomObject {
   clone() {
     return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
   }
-  equals(angle) {
-    equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
+  equals(angle: Angle): boolean {
+    return equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
   }
 }
 class Vector extends GeomObject {
+  getIntersection(object: GeomObject): GeomObject {
+    throw new Error("Method not implemented.");
+  }
   x: number;
   y: number;
   endpointOf: GeomObject[] = [];
@@ -1161,7 +1172,7 @@ class LineSegment extends LinearObject {
     }
     return undefined;
   };
-  perpThrough(vector) {
+  perpThrough(vector: Vector): Line {
     var perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
 
     if (this.getLineIntersection(perp)) {
@@ -1256,7 +1267,7 @@ class LineSegment extends LinearObject {
   getArcIntersection(arc) {
     return arc.getLineIntersection(this);
   }
-  getLocusIntersection(locus) {
+  getLocusIntersection(locus: Locus): GeomObject {
     return locus.getSingleObjIntersection(this);
   }
   equals(line) {
@@ -1287,7 +1298,7 @@ class Line extends LinearObject {
   yInt(): number {
     throw new Error("Method not implemented.");
   }
-  getLocusIntersection(locus: (set: any) => void): GeomObject {
+  getLocusIntersection(locus: Locus): GeomObject {
     throw new Error("Method not implemented.");
   }
   dilated(center: Vector, factor: number): GeomObject {
@@ -1755,29 +1766,66 @@ class Dilation extends Transformation {
   }
 }
 
-function Locus(set) {
-  this.set = set || [];
-
-  this.removeDupes = function() {
+class Locus extends GeomObject {
+  equals(object: GeomObject): boolean {
+    throw new Error("Method not implemented.");
+  }
+  translate(vector: Vector): void {
+    throw new Error("Method not implemented.");
+  }
+  translated(vector: Vector): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  dilated(center: Vector, factor: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  rotated(center: Vector, angle: number): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  distanceTo(vector: Vector): number {
+    throw new Error("Method not implemented.");
+  }
+  receive(transformation: any): void {
+    throw new Error("Method not implemented.");
+  }
+  clone(): GeomObject {
+    throw new Error("Method not implemented.");
+  }
+  nameString(): string {
+    throw new Error("Method not implemented.");
+  }
+  detailsString(): string {
+    throw new Error("Method not implemented.");
+  }
+  toString(): string {
+    throw new Error("Method not implemented.");
+  }
+  draw(offset: Vector, dilation: number, color: string, thickness: number): void {
+    throw new Error("Method not implemented.");
+  }
+  set: GeomObject[];
+  constructor(set: GeomObject[]) {
+    super();
+    this.set = set || [];
+    this.removeDupes();
+  }
+  removeDupes() {
     this.set = this.set.filter((obj, i) => !this.set.slice(i + 1).some(o =>
       o.constructor.name === obj.constructor.name && o.equals(obj)));
   }
-
-  this.removeDupes();
-
-  this.get = function() {
+  get() {
     return this.set;
   }
-  this.isEmpty = function() {
+  isEmpty() {
     return this.set.length === 0;
   }
-  this.flatten = function(layers) {
-    return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
+  flatten() {
+    return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? (obj as Locus).get() : obj));
   }
-  this.union = function(locus) {
+  union(locus) {
     return new Locus(this.set.concat(locus.get()));
   }
-  this.getIntersection = function(obj) {
+  getIntersection(obj) {
     if (obj.constructor.name === Locus.name) {
       return this.getLocusIntersection(obj);
     }
@@ -1785,8 +1833,8 @@ function Locus(set) {
       return this.getSingleObjIntersection(obj);
     }
   }
-  this.getSingleObjIntersection = function(obj) {
-    var ints = [];
+  getSingleObjIntersection(obj) {
+    var ints: GeomObject[] = [];
     this.set.forEach(setObj => {
       var intersection;
       if (setObj.constructor.name === Vector.name) {
@@ -1802,7 +1850,7 @@ function Locus(set) {
         intersection = obj.getArcIntersection(setObj);
       }
       if (setObj.constructor.name === Locus.name) {
-        intersection = setObj.getSingleObjIntersection(obj);
+        intersection = (setObj as Locus).getSingleObjIntersection(obj);
       }
       if (intersection) {
         ints.push(intersection);
@@ -1810,18 +1858,18 @@ function Locus(set) {
     });
     return new Locus(ints);
   }
-  this.pointClosestTo = function(vector) {
+  pointClosestTo(vector) {
     return this.set.map(obj => obj.pointClosestTo(vector)).reduce((cur, closest) =>
     cur.distanceTo(vector) < closest.distanceTo(vector) ? cur : closest);
   }
-  this.getLocusIntersection = function(locus) {
+  getLocusIntersection(locus) {
     var intSet = [];
     this.set.forEach(obj => {
       intSet.push(locus.getIntersection(obj));
     });
     return new Locus(intSet).flatten();
   }
-  this.getSelfIntersection = function() {
+  getSelfIntersection() {
     if (this.set.length === 1) {
       return this.set[0];
     }

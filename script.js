@@ -501,6 +501,9 @@ class LinearObject extends DimensionalObject {
     ;
 }
 class Arc extends DimensionalObject {
+    equals(object) {
+        throw new Error("Method not implemented.");
+    }
     rotated(center, angle) {
         throw new Error("Method not implemented.");
     }
@@ -691,6 +694,9 @@ class Angle extends GeomObject {
         this.vertex = vertex;
         this.p2 = p2;
     }
+    getIntersection(object) {
+        throw new Error("Method not implemented.");
+    }
     translate(vector) {
         throw new Error("Method not implemented.");
     }
@@ -744,7 +750,7 @@ class Angle extends GeomObject {
         return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
     }
     equals(angle) {
-        equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
+        return equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
     }
 }
 class Vector extends GeomObject {
@@ -753,6 +759,9 @@ class Vector extends GeomObject {
         this.endpointOf = [];
         this.x = x;
         this.y = y;
+    }
+    getIntersection(object) {
+        throw new Error("Method not implemented.");
     }
     setAsEndpoint(line) {
         this.endpointOf.push(line);
@@ -1666,33 +1675,72 @@ class Dilation extends Transformation {
         return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
     }
 }
-function Locus(set) {
-    this.set = set || [];
-    this.removeDupes = function () {
+class Locus extends GeomObject {
+    equals(object) {
+        throw new Error("Method not implemented.");
+    }
+    translate(vector) {
+        throw new Error("Method not implemented.");
+    }
+    translated(vector) {
+        throw new Error("Method not implemented.");
+    }
+    dilated(center, factor) {
+        throw new Error("Method not implemented.");
+    }
+    rotated(center, angle) {
+        throw new Error("Method not implemented.");
+    }
+    distanceTo(vector) {
+        throw new Error("Method not implemented.");
+    }
+    receive(transformation) {
+        throw new Error("Method not implemented.");
+    }
+    clone() {
+        throw new Error("Method not implemented.");
+    }
+    nameString() {
+        throw new Error("Method not implemented.");
+    }
+    detailsString() {
+        throw new Error("Method not implemented.");
+    }
+    toString() {
+        throw new Error("Method not implemented.");
+    }
+    draw(offset, dilation, color, thickness) {
+        throw new Error("Method not implemented.");
+    }
+    constructor(set) {
+        super();
+        this.set = set || [];
+        this.removeDupes();
+    }
+    removeDupes() {
         this.set = this.set.filter((obj, i) => !this.set.slice(i + 1).some(o => o.constructor.name === obj.constructor.name && o.equals(obj)));
-    };
-    this.removeDupes();
-    this.get = function () {
+    }
+    get() {
         return this.set;
-    };
-    this.isEmpty = function () {
+    }
+    isEmpty() {
         return this.set.length === 0;
-    };
-    this.flatten = function (layers) {
+    }
+    flatten() {
         return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
-    };
-    this.union = function (locus) {
+    }
+    union(locus) {
         return new Locus(this.set.concat(locus.get()));
-    };
-    this.getIntersection = function (obj) {
+    }
+    getIntersection(obj) {
         if (obj.constructor.name === Locus.name) {
             return this.getLocusIntersection(obj);
         }
         else {
             return this.getSingleObjIntersection(obj);
         }
-    };
-    this.getSingleObjIntersection = function (obj) {
+    }
+    getSingleObjIntersection(obj) {
         var ints = [];
         this.set.forEach(setObj => {
             var intersection;
@@ -1716,18 +1764,18 @@ function Locus(set) {
             }
         });
         return new Locus(ints);
-    };
-    this.pointClosestTo = function (vector) {
+    }
+    pointClosestTo(vector) {
         return this.set.map(obj => obj.pointClosestTo(vector)).reduce((cur, closest) => cur.distanceTo(vector) < closest.distanceTo(vector) ? cur : closest);
-    };
-    this.getLocusIntersection = function (locus) {
+    }
+    getLocusIntersection(locus) {
         var intSet = [];
         this.set.forEach(obj => {
             intSet.push(locus.getIntersection(obj));
         });
         return new Locus(intSet).flatten();
-    };
-    this.getSelfIntersection = function () {
+    }
+    getSelfIntersection() {
         if (this.set.length === 1) {
             return this.set[0];
         }
@@ -1737,7 +1785,7 @@ function Locus(set) {
             return new Locus(intsSharedByAll);
         }
         return null;
-    };
+    }
 }
 function Grid() {
     this.gridGap = 0;
