@@ -1864,7 +1864,7 @@ class Dilation extends Transformation {
   factor: number;
   constructor(object, center, factor, args?) {
     super(object, args);
-    this.name = "rotation";
+    this.name = "dilation";
     this.center = center;
     this.factor = factor;
     if (this.preImage) {

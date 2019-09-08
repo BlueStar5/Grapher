@@ -1776,7 +1776,7 @@ function Extension(object, endpoint, distance, args) {
 class Dilation extends Transformation {
     constructor(object, center, factor, args) {
         super(object, args);
-        this.name = "rotation";
+        this.name = "dilation";
         this.center = center;
         this.factor = factor;
         if (this.preImage) {
@@ -1804,10 +1804,6 @@ class Dilation extends Transformation {
             return `${this.object.nameString()} has been dilated.`;
         }
     }
-    // this.receivers = [];
-    // this.addReceiver(object) {
-    //   this.receivers.push(object);
-    // }
     equals(transformation) {
         return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.factor === transformation.factor;
     }
