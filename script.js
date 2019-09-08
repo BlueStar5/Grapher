@@ -860,21 +860,6 @@ class Vector extends GeomObject {
                     this.rotate(rotation.center, rotation.radians, rotation);
                 }
             }
-            if (transformation.name === 'extension') {
-                var extension = transformation;
-                var line = extension.object;
-                var fixedTo = line.constraints.fixedTo;
-                if (!fixedTo.includes(this)) {
-                    var endpoint = extension.endpoint;
-                    var otherEndpoint = line.endpoints.filter(p => p !== endpoint)[0];
-                    console.log(endpoint.toString());
-                    console.log(otherEndpoint.toString());
-                    // if endpoint passed this point, then move this point back to endpoint
-                    if (endpoint.distanceTo(otherEndpoint) < this.distanceTo(otherEndpoint)) {
-                        this.translate(endpoint.subtract(this));
-                    }
-                }
-            }
             if (transformation.name === 'dilation') {
                 var dilation = transformation;
                 if (!dilation.center.equals(this)) {
@@ -1034,11 +1019,9 @@ class LineSegment extends LinearObject {
             var rotation = new Rotation(this, center, angle, { exclude: [translation.object].concat(existingExclusions), preImage: this });
             var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
             var endpoint = translation.getPreImage().rotated(center, angle);
-            //var extension = new Extension(this, translation.object, distance, {preImage: rotation.getImage()});
             var dilation = new Dilation(this, center, this.length() / (this.length() - distance), { exclude: [translation.object].concat(existingExclusions), preImage: this });
             log.broadcast(rotation);
             log.broadcast(dilation);
-            //log.broadcast(extension);
         }
     }
     ;
@@ -1603,56 +1586,6 @@ class Translation extends Transformation {
         return this.id === transformation.id && this.name === transformation.name;
     }
 }
-function _Translation(object, vector, args) {
-    this.id = 0;
-    this.name = 'translation';
-    this.object = object;
-    this.vector = vector;
-    if (args) {
-        this.exclude = args.exclude;
-        if (args.preImage) {
-            this.preImage = args.preImage;
-            this.image = this.preImage.translated(vector);
-        }
-        else if (args.image) {
-            this.image = args.image;
-            this.preImage = this.image.translated(vector.negative());
-        }
-        else {
-            this.preImage = this.object.translated(vector.negative());
-            this.image = this.object.clone();
-        }
-        /*this.preImage = args.preImage ? args.preImage.clone() : undefined;
-        this.image = args.image ? args.image.clone() : undefined;*/
-    }
-    this.getPreImage = function () {
-        return this.preImage || (this.image ? this.image.translated(vector.negative()) : null) || this.object.translated(vector.negative());
-    };
-    this.getImage = function () {
-        return this.image || (this.preImage ? this.preImage.translated(vector) : null) || this.object.clone();
-    };
-    this.toString = function () {
-        if (settings.detailedConsole) {
-            return `${object.nameString()} ${this.getPreImage().detailsString()} has been translated ${vector.detailsString()} to ${this.getImage().detailsString()}.`;
-        }
-        else {
-            return `${object.nameString()} has been translated.`;
-        }
-    };
-    /*this.receivers = [];
-    this.addReceiver = function(object) {
-      this.receivers.push(object);
-    }*/
-    this.equals = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.vector.equals(transformation.vector);
-    };
-    this.similarTo = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name;
-    };
-    /*this.receivedBy = function(object) {
-      return this.receivers.includes(object);
-    }*/
-}
 class Rotation extends Transformation {
     constructor(object, center, radians, args) {
         super(object, args);
@@ -1695,84 +1628,6 @@ class Rotation extends Transformation {
         return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
     }
 }
-function _Rotation(object, center, radians, args) {
-    this.id = 0;
-    this.name = 'rotation';
-    this.object = object;
-    this.center = center;
-    this.radians = radians;
-    if (args) {
-        this.exclude = args.exclude;
-        this.preImage = args.preImage ? args.preImage.clone() : undefined;
-        this.image = args.image ? args.image.clone() : undefined;
-    }
-    this.getPreImage = function () {
-        return this.preImage || (this.image ? this.image.rotated(center, -radians) : null) || this.object.rotated(center, -radians);
-    };
-    this.getImage = function () {
-        return this.image || (this.preImage ? this.preImage.rotated(center, radians) : null) || this.object.clone();
-    };
-    this.toString = function () {
-        if (settings.detailedConsole) {
-            return `${object.nameString()} ${this.getPreImage().detailsString()} has been rotated ${radians} radians about ${center.detailsString()} to ${this.getImage().detailsString()}.`;
-        }
-        else {
-            return `${object.nameString()} has been rotated.`;
-        }
-    };
-    // this.receivers = [];
-    // this.addReceiver = function(object) {
-    //   this.receivers.push(object);
-    // }
-    this.equals = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.radians === transformation.radians;
-    };
-    this.similarTo = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
-    };
-    // this.receivedBy = function(object) {
-    //   return this.receivers.includes(object);
-    // }
-}
-function Extension(object, endpoint, distance, args) {
-    this.id = 0;
-    this.name = 'extension';
-    this.object = object;
-    this.endpoint = endpoint;
-    this.distance = distance;
-    if (args) {
-        this.exclude = args.exclude;
-        this.preImage = args.preImage ? args.preImage.clone() : undefined;
-        this.image = args.image ? args.image.clone() : undefined;
-    }
-    this.getPreImage = function () {
-        return this.preImage || (this.image ? this.image.extended(this.endpoint, -this.distance) : null) || this.object.extended(this.endpoint, -this.distance);
-    };
-    this.getImage = function () {
-        return this.image || (this.preImage ? this.preImage.extended(this.endpoint, this.distance) : null) || this.object.clone();
-    };
-    this.toString = function () {
-        if (settings.detailedConsole) {
-            return `${object.nameString()} ${this.getPreImage().detailsString()} has been extended through point ${this.endpoint.detailsString()} to ${this.getImage().detailsString()}.`;
-        }
-        else {
-            return `${object.nameString()} has been extended.`;
-        }
-    };
-    // this.receivers = [];
-    // this.addReceiver = function(object) {
-    //   this.receivers.push(object);
-    // }
-    this.equals = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.endpoint.equals(transformation.endpoint) && this.distance === transformation.distance;
-    };
-    this.similarTo = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.endpoint.equals(transformation.endpoint);
-    };
-    // this.receivedBy = function(object) {
-    //   return this.receivers.includes(object);
-    // }
-}
 class Dilation extends Transformation {
     constructor(object, center, factor, args) {
         super(object, args);
@@ -1810,45 +1665,6 @@ class Dilation extends Transformation {
     similarTo(transformation) {
         return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
     }
-}
-function _Dilation(object, center, factor, args) {
-    this.id = 0;
-    this.name = 'dilation';
-    this.object = object;
-    this.center = center;
-    this.factor = factor;
-    if (args) {
-        this.exclude = args.exclude;
-        this.preImage = args.preImage ? args.preImage.clone() : undefined;
-        this.image = args.image ? args.image.clone() : undefined;
-    }
-    this.getPreImage = function () {
-        return this.preImage || (this.image ? this.image.dilated(this.center, 1 / this.factor) : null) || this.object.dilated(this.center, 1 / this.factor);
-    };
-    this.getImage = function () {
-        return this.image || (this.preImage ? this.preImage.dilated(this.center, this.factor) : null) || this.object.clone();
-    };
-    this.toString = function () {
-        if (settings.detailedConsole) {
-            return `${object.nameString()} ${this.getPreImage().detailsString()} has been dilated ${this.factor}x about ${this.center.detailsString()} to ${this.getImage().detailsString()}.`;
-        }
-        else {
-            return `${object.nameString()} has been dilated.`;
-        }
-    };
-    // this.receivers = [];
-    // this.addReceiver = function(object) {
-    //   this.receivers.push(object);
-    // }
-    this.equals = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center) && this.factor === transformation.factor;
-    };
-    this.similarTo = function (transformation) {
-        return this.id === transformation.id && this.name === transformation.name && this.center.equals(transformation.center);
-    };
-    // this.receivedBy = function(object) {
-    //   return this.receivers.includes(object);
-    // }
 }
 function Locus(set) {
     this.set = set || [];
