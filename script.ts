@@ -1652,6 +1652,250 @@ class ArcCreation extends Creation {
     super.execute();
   }
 }
+class Camera {
+  //this.origin = new Vector(-width / 2, -height / 2);
+  min: Vector;
+  max: Vector;
+
+  plane: Plane;
+
+  width: number;
+  height: number;
+
+  dilation: number;
+  perPixel: number;
+  gridGap: number;
+
+  constructor(minX, minY, maxX, maxY, plane) {
+    this.min = new Vector(minX, minY);
+    this.max = new Vector(maxX, maxY);
+    this.plane = plane;
+    this.width = this.max.subtract(this.min).x;
+    this.height = this.max.subtract(this.min).y;
+    this.dilation = 100;
+    this.perPixel = 100;
+    this.gridGap = 50;
+  }
+  drawLines(lines, gridColors?) {
+    var color = settings.lineColor;
+
+    var offset = this.min.negative();
+
+    // set the boundaries of the grid
+    var boundaryX1 = new LineSegment
+    (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.minY));
+    var boundaryX2 = new LineSegment
+    (new Vector(this.plane.grid.minX, this.plane.grid.maxY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
+    var boundaryY1 = new LineSegment
+    (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.minX, this.plane.grid.maxY));
+    var boundaryY2 = new LineSegment
+    (new Vector(this.plane.grid.maxX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
+
+    lines.forEach(l => {
+      if (gridColors) {
+        var dPlaces = settings.displayPlaces;
+        // if y-axis, set to y-axis color
+        if (roundFromZero(l.p1.x, dPlaces) === 0 && roundFromZero(l.p2.x, dPlaces) === 0) {
+          color = gridColors.x;
+        }
+        // if x-axis, set to x-axis color
+        else if (roundFromZero(l.p1.y, dPlaces) === 0 && roundFromZero(l.p2.y, dPlaces) === 0) {
+          color = gridColors.y;
+        }
+        // else, set to grid line color
+        else {
+          color = gridColors.grid;
+        }
+      }
+      // store points of new LineSegment that will be drawn
+      var points = [];
+      // iterate over each endpoint of the line
+      [l.p1, l.p2].forEach(p => {
+        // if the line extends beyond the camera, use an intersection with the camera instead
+        if (!(p.x >= this.plane.grid.minX && p.x <= this.plane.grid.maxX && p.y >= this.plane.grid.minY && p.y <= this.plane.grid.maxY) || l.length() === Infinity) {
+          // find intersections of the line and the grid (4 max)
+          p = [l.getLineIntersection(boundaryX1), l.getLineIntersection(boundaryX2),
+            l.getLineIntersection(boundaryY1), l.getLineIntersection(boundaryY2)]
+            // ensure intersection exists and isn't already a point of the new LineSegment to be drawn
+            // TODO
+            .filter(i => i && !(points.length && points[0].x === i.x && points[0].y === i.y))
+            // choose the intersection closest to the original point
+            // TODO
+            .reduce((min, cur) => (!min || cur.subtract(p).magnitude() < min.subtract(p).magnitude()) ? cur : min, undefined);
+        }
+        else {
+          p = p.clone();
+        }
+        // add the point to the list of valid points
+        points.push(p);
+      });
+      if (points[0] && points[1]) {
+          var thickness = settings.lineThickness;
+          if (gridColors) {
+            thickness = settings.gridThickness;
+          }
+          else if (selections.isSelected(l)) {
+            thickness = settings.selectedThickness;
+          }
+          // draw the LineSegment of the line that's in the grid
+          new LineSegment(points[0], points[1]).draw(offset, color, 100 / this.perPixel, thickness);
+          // if grid line
+          if (gridColors) {
+            var dPlaces = settings.displayPlaces;
+            ctx.fillStyle = '#eee';
+            // if horizontal, write y-coordinate along the y-axis
+            if (l.getSlope() == 0) {
+              ctx.fillText(`${roundFromZero(l.p1.y, dPlaces)}`, roundFromZero(offset.x), roundFromZero(offset.y - l.p1.y * 100 / this.perPixel), 30);
+            }
+            // if vertical, write x-coordinate along the x-axis
+            else {
+              ctx.fillText(`${roundFromZero(l.p1.x, dPlaces)}`, roundFromZero(l.p1.x * 100 / this.perPixel + offset.x), roundFromZero(offset.y), 30);
+            }
+          }
+          else {
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.fillText(l.id, roundFromZero(l.midpoint().x + offset.x), roundFromZero(-l.midpoint().y + offset.y) + 4, 20);
+            ctx.textAlign = "start";
+            ctx.textBaseline = "alphabetic";
+          }
+        }
+    });
+  };
+  drawArcs(arcs) {
+    arcs.forEach(a => this.drawArc(a));
+  }
+  drawArc(arc) {
+    var thickness = (selections.isSelected(arc) ? settings.selectedThickness : settings.lineThickness);
+    arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
+  }
+
+  resize(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY) {
+    this.min = this.min.add(new Vector(deltaMinX, deltaMinY));
+    this.max = this.max.add(new Vector(deltaMaxX, deltaMaxY));
+  };
+
+  dilate(factor) {
+    this.min = this.min.multiply(factor);
+    this.max = this.max.multiply(factor);
+  };
+
+  scaleContent(change, translation) {
+    this.dilation *= change;
+    this.gridGap *= change;
+    this.perPixel /= change;
+
+    if (this.dilation <= 50) {
+      this.gridGap *= 2;
+      this.dilation = 100;
+    }
+    if (this.dilation >= 200) {
+      this.dilation = 100;
+      this.gridGap /= 2;
+    }
+    if (settings.focusZoom) {
+      // dilate about the mouse wheel point
+      this.translate(translation);
+      this.dilate(1 / change);
+      this.translate(translation.negative());
+      this.dilate(change);
+    }
+  };
+  translate(translation) {
+    this.min = this.min.add(translation);
+    this.max = this.max.add(translation);
+  };
+
+  update() {
+    this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
+
+    ctx.fillStyle = settings.gridBackground;
+    ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
+
+    this.drawArcs(this.plane.arcs);
+    this.drawLines(this.plane.grid.lines, settings.gridLineColors);
+    this.drawLines(this.plane.lines);
+    this.drawVectors(this.plane.getVectors());
+  };
+  drawVectors(vectors) {
+    vectors.forEach(v => {
+      this.drawVector(v);
+    });
+  };
+  drawVector(v) {
+      if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
+        var radius = settings.pointRadius;
+        if (selections.isSelected(v)) {
+          radius = settings.selectedRadius;
+        }
+        v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
+      }
+  };
+}
+class Plane {
+  vectors = [];
+  lines = [];
+  arcs = [];
+  tempVectors = [];
+  intersections = [];
+  grid;
+  constructor(grid) {
+    this.grid = grid;
+  }
+
+
+  getObjects() {
+    return this.vectors.concat(this.lines).concat(this.arcs);
+  }
+  getObject(id) {
+    return this.getObjects().filter(o => o.id === id)[0] || null;
+  }
+  getParents() {
+    return this.getObjects().filter(obj => !this.vectors.includes(obj));
+  }
+  removeTempVector(vector) {
+    this.tempVectors.splice(this.tempVectors.indexOf(vector), 1);
+  }
+
+  numObjects() {
+    return this.getObjects().length;
+  }
+  getVectors() {
+    return this.vectors.concat(this.tempVectors);
+  }
+  getVector(id) {
+    return this.vectors.filter(v => v.id === id)[0] || null;
+  }
+  addVector(vector) {
+    if (vector.id === undefined) {
+      vector.setId(plane.numObjects());
+      this.vectors.push(vector);
+    }
+  }
+  removeVector(vector) {
+    this.vectors.splice(this.vectors.indexOf(vector), 1);
+  }
+  addTempVector(vector) {
+    this.tempVectors.push(vector);
+  }
+  getParent(id) {
+    return this.getParents().filter(p => p.id === id)[0] || null;
+  }
+  getLine(id) {
+    return this.lines.filter(l => l.id === id)[0] || null;
+  }
+  getArc(id) {
+    return this.arcs.filter(a => a.id === id)[0] || null;
+  }
+  addLine(line) {
+    line.setId(plane.numObjects());
+    this.lines.push(line);
+  }
+  addArc(arc) {
+    arc.setId(plane.numObjects());
+    this.arcs.push(arc);
+  }
+}
 ui.init();
 
 var ctx = ui.canvas.getContext('2d');
@@ -1941,239 +2185,6 @@ class Locus extends GeomObject {
       return new Locus(intsSharedByAll);
     }
     return null;
-  }
-}
-
-
-function Camera(minX, minY, maxX, maxY, plane) {
-  //this.origin = new Vector(-width / 2, -height / 2);
-
-  this.min = new Vector(minX, minY);
-  this.max = new Vector(maxX, maxY);
-
-  this.width = this.max.subtract(this.min).x;
-  this.height = this.max.subtract(this.min).y;
-
-  this.dilation = 100;
-  this.perPixel = 100;
-  this.gridGap = 50;
-
-  this.plane = plane;
-
-  this.drawLines = function(lines, gridColors) {
-    var color = settings.lineColor;
-
-    var offset = this.min.negative();
-
-    // set the boundaries of the grid
-    var boundaryX1 = new LineSegment
-    (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.minY));
-    var boundaryX2 = new LineSegment
-    (new Vector(this.plane.grid.minX, this.plane.grid.maxY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
-    var boundaryY1 = new LineSegment
-    (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.minX, this.plane.grid.maxY));
-    var boundaryY2 = new LineSegment
-    (new Vector(this.plane.grid.maxX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
-
-    lines.forEach(l => {
-      if (gridColors) {
-        var dPlaces = settings.displayPlaces;
-        // if y-axis, set to y-axis color
-        if (roundFromZero(l.p1.x, dPlaces) === 0 && roundFromZero(l.p2.x, dPlaces) === 0) {
-          color = gridColors.x;
-        }
-        // if x-axis, set to x-axis color
-        else if (roundFromZero(l.p1.y, dPlaces) === 0 && roundFromZero(l.p2.y, dPlaces) === 0) {
-          color = gridColors.y;
-        }
-        // else, set to grid line color
-        else {
-          color = gridColors.grid;
-        }
-      }
-      // store points of new LineSegment that will be drawn
-      var points = [];
-      // iterate over each endpoint of the line
-      [l.p1, l.p2].forEach(p => {
-        // if the line extends beyond the camera, use an intersection with the camera instead
-        if (!(p.x >= this.plane.grid.minX && p.x <= this.plane.grid.maxX && p.y >= this.plane.grid.minY && p.y <= this.plane.grid.maxY) || l.length() === Infinity) {
-          // find intersections of the line and the grid (4 max)
-          p = [l.getLineIntersection(boundaryX1), l.getLineIntersection(boundaryX2),
-            l.getLineIntersection(boundaryY1), l.getLineIntersection(boundaryY2)]
-            // ensure intersection exists and isn't already a point of the new LineSegment to be drawn
-            // TODO
-            .filter(i => i && !(points.length && points[0].x === i.x && points[0].y === i.y))
-            // choose the intersection closest to the original point
-            // TODO
-            .reduce((min, cur) => (!min || cur.subtract(p).magnitude() < min.subtract(p).magnitude()) ? cur : min, undefined);
-        }
-        else {
-          p = p.clone();
-        }
-        // add the point to the list of valid points
-        points.push(p);
-      });
-      if (points[0] && points[1]) {
-          var thickness = settings.lineThickness;
-          if (gridColors) {
-            thickness = settings.gridThickness;
-          }
-          else if (selections.isSelected(l)) {
-            thickness = settings.selectedThickness;
-          }
-          // draw the LineSegment of the line that's in the grid
-          new LineSegment(points[0], points[1]).draw(offset, color, 100 / this.perPixel, thickness);
-          // if grid line
-          if (gridColors) {
-            var dPlaces = settings.displayPlaces;
-            ctx.fillStyle = '#eee';
-            // if horizontal, write y-coordinate along the y-axis
-            if (l.getSlope() == 0) {
-              ctx.fillText(`${roundFromZero(l.p1.y, dPlaces)}`, roundFromZero(offset.x), roundFromZero(offset.y - l.p1.y * 100 / this.perPixel), 30);
-            }
-            // if vertical, write x-coordinate along the x-axis
-            else {
-              ctx.fillText(`${roundFromZero(l.p1.x, dPlaces)}`, roundFromZero(l.p1.x * 100 / this.perPixel + offset.x), roundFromZero(offset.y), 30);
-            }
-          }
-          else {
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            ctx.fillText(l.id, roundFromZero(l.midpoint().x + offset.x), roundFromZero(-l.midpoint().y + offset.y) + 4, 20);
-            ctx.textAlign = "start";
-            ctx.textBaseline = "alphabetic";
-          }
-        }
-    });
-  };
-  this.drawArcs = function(arcs) {
-    arcs.forEach(a => this.drawArc(a));
-  }
-  this.drawArc = function(arc) {
-    var thickness = (selections.isSelected(arc) ? settings.selectedThickness : settings.lineThickness);
-    arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
-  }
-
-  this.resize = function(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY) {
-    this.min = this.min.add(new Vector(deltaMinX, deltaMinY));
-    this.max = this.max.add(new Vector(deltaMaxX, deltaMaxY));
-  };
-
-  this.dilate = function(factor) {
-    this.min = this.min.multiply(factor);
-    this.max = this.max.multiply(factor);
-  };
-
-  this.scaleContent = function(change, translation) {
-    this.dilation *= change;
-    this.gridGap *= change;
-    this.perPixel /= change;
-
-    if (this.dilation <= 50) {
-      this.gridGap *= 2;
-      this.dilation = 100;
-    }
-    if (this.dilation >= 200) {
-      this.dilation = 100;
-      this.gridGap /= 2;
-    }
-    if (settings.focusZoom) {
-      // dilate about the mouse wheel point
-      this.translate(translation);
-      this.dilate(1 / change);
-      this.translate(translation.negative());
-      this.dilate(change);
-    }
-  };
-  this.translate = function(translation) {
-    this.min = this.min.add(translation);
-    this.max = this.max.add(translation);
-  };
-
-  this.update = function() {
-    this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
-
-    ctx.fillStyle = settings.gridBackground;
-    ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
-
-    this.drawArcs(this.plane.arcs);
-    this.drawLines(this.plane.grid.lines, settings.gridLineColors);
-    this.drawLines(this.plane.lines);
-    this.drawVectors(this.plane.getVectors());
-  };
-  this.drawVectors = function(vectors) {
-    vectors.forEach(v => {
-      this.drawVector(v);
-    });
-  };
-  this.drawVector = function(v) {
-      if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
-        var radius = settings.pointRadius;
-        if (selections.isSelected(v)) {
-          radius = settings.selectedRadius;
-        }
-        v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
-      }
-  };
-}
-function Plane(grid) {
-  this.vectors = [];
-  this.lines = [];
-  this.arcs = [];
-  this.tempVectors = [];
-  this.intersections = [];
-  this.grid = grid;
-
-  this.getObjects = function() {
-    return this.vectors.concat(this.lines).concat(this.arcs);
-  }
-  this.getObject = function(id) {
-    return this.getObjects().filter(o => o.id === id)[0] || null;
-  }
-  this.getParents = function() {
-    return this.getObjects().filter(obj => !this.vectors.includes(obj));
-  }
-  this.removeTempVector = function(vector) {
-    this.tempVectors.splice(this.tempVectors.indexOf(vector), 1);
-  }
-
-  this.numObjects = function() {
-    return this.getObjects().length;
-  }
-  this.getVectors = function() {
-    return this.vectors.concat(this.tempVectors);
-  }
-  this.getVector = function(id) {
-    return this.vectors.filter(v => v.id === id)[0] || null;
-  }
-  this.addVector = function(vector) {
-    if (vector.id === undefined) {
-      vector.setId(plane.numObjects());
-      this.vectors.push(vector);
-    }
-  }
-  this.removeVector = function(vector) {
-    this.vectors.splice(this.vectors.indexOf(vector), 1);
-  }
-  this.addTempVector = function(vector) {
-    this.tempVectors.push(vector);
-  }
-  this.getParent = function(id) {
-    return this.getParents().filter(p => p.id === id)[0] || null;
-  }
-  this.getLine = function(id) {
-    return this.lines.filter(l => l.id === id)[0] || null;
-  }
-  this.getArc = function(id) {
-    return this.arcs.filter(a => a.id === id)[0] || null;
-  }
-  this.addLine = function(line) {
-    line.setId(plane.numObjects());
-    this.lines.push(line);
-  }
-  this.addArc = function(arc) {
-    arc.setId(plane.numObjects());
-    this.arcs.push(arc);
   }
 }
 
