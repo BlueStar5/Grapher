@@ -1,5 +1,5 @@
-declare var ResizeSensor;
-var settings = {
+declare let ResizeSensor;
+let settings = {
   mode: "pan",
 
   selecting: function() {
@@ -41,7 +41,7 @@ var settings = {
   vectorColor: '#f80',
   lineColor: '#0ac'
 };
-var selections = {
+let selections = {
   groups: [[], []],
   groupNum: 0,
   setNextGroup: function() {
@@ -59,7 +59,7 @@ var selections = {
     return this.groups[this.groupNum];
   },
   lastSelected: function() {
-    var selected = this.getSelected();
+    let selected = this.getSelected();
     return selected[selected.length - 1];
   },
   getGroup: function() {
@@ -69,7 +69,7 @@ var selections = {
     this.getGroup().length = 0;
   },
   addToGroup: function(object, groupNum = this.groupNum) {
-    var group;
+    let group;
     if (groupNum !== undefined) {
       group = this.groups[groupNum];
     }
@@ -81,7 +81,7 @@ var selections = {
     }
   },
   setCommandGroup: function(command, groupNum) {
-    var commandGroups = this.commandSelectGroups[command];
+    let commandGroups = this.commandSelectGroups[command];
     if (groupNum === undefined) {
       groupNum = this.groupNum;
     }
@@ -99,7 +99,7 @@ var selections = {
     segment: []
   }
 }
-var ui = {
+let ui = {
   canvas: <HTMLCanvasElement> document.getElementById('canvas'),
   canvasWrapper: document.getElementById('canvas-wrapper'),
   leftSide: document.getElementById('left'),
@@ -112,7 +112,7 @@ var ui = {
   objectChildren: document.getElementById('object-children'),
   props: document.getElementsByClassName('properties'),
   clearProps: function() {
-    for (var i = 0; i < this.props.length; i++) {
+    for (let i = 0; i < this.props.length; i++) {
       this.props[i].classList.add('no-display');
     }
     while (this.objectChildren.firstChild) {
@@ -120,12 +120,12 @@ var ui = {
     }
   },
   updateVectorProps: function(vector) {
-    var vectorProps : HTMLDivElement = <HTMLDivElement> document.getElementsByClassName(vector.id)[0] || <HTMLDivElement> document.getElementsByName('vector')[0];
+    let vectorProps : HTMLDivElement = <HTMLDivElement> document.getElementsByClassName(vector.id)[0] || <HTMLDivElement> document.getElementsByName('vector')[0];
 
     vectorProps.classList.remove('no-display');
 
-    var inputX : HTMLInputElement = <HTMLInputElement> vectorProps.children.namedItem('vector-x').children[0];
-    var inputY : HTMLInputElement = <HTMLInputElement> vectorProps.children.namedItem('vector-y').children[0];
+    let inputX : HTMLInputElement = <HTMLInputElement> vectorProps.children.namedItem('vector-x').children[0];
+    let inputY : HTMLInputElement = <HTMLInputElement> vectorProps.children.namedItem('vector-y').children[0];
 
     [inputX, inputY].forEach(i => i.addEventListener('input', e => {
       vector.setPosition(new Vector(parseFloat(inputX.value), parseFloat(inputY.value)));
@@ -142,7 +142,7 @@ var ui = {
 
     /*line.children.forEach(c => {
       if (!document.getElementsByClassName(c.id).length) {
-        var li = document.createElement('li');
+        let li = document.createElement('li');
         li.appendChild(this.getVectorTemplate(c));
         this.objectChildren.appendChild(li);
       }
@@ -150,22 +150,22 @@ var ui = {
     });*/
   },
   getVectorTemplate: function(vector) {
-    var textH2 = document.createTextNode('Vector');
+    let textH2 = document.createTextNode('Vector');
 
-    var h2 = document.createElement('h2');
+    let h2 = document.createElement('h2');
     h2.classList.add('side-heading');
     h2.classList.add('properties-heading');
     h2.appendChild(textH2);
 
-    var textX = document.createTextNode('x: ');
+    let textX = document.createTextNode('x: ');
 
-    var textY = document.createTextNode('y: ');
+    let textY = document.createTextNode('y: ');
 
-    var inputX = document.createElement('input');
+    let inputX = document.createElement('input');
     inputX.type = 'text';
     inputX.value = vector.x;
 
-    var inputY = document.createElement('input');
+    let inputY = document.createElement('input');
     inputY.type = 'text';
     inputY.value = vector.y;
 
@@ -174,17 +174,17 @@ var ui = {
       cam.update();
     }));
 
-    var labelX = document.createElement('label');
+    let labelX = document.createElement('label');
     labelX.setAttribute('name', 'vector-x');
     labelX.appendChild(textX);
     labelX.appendChild(inputX);
 
-    var labelY = document.createElement('label');
+    let labelY = document.createElement('label');
     labelY.setAttribute('name', 'vector-y');
     labelY.appendChild(textY);
     labelY.appendChild(inputY);
 
-    var div = document.createElement('div');
+    let div = document.createElement('div');
     div.setAttribute('name', 'vector');
     div.classList.add('properties');
     div.classList.add(vector.id);
@@ -201,15 +201,15 @@ var ui = {
     return parseInt(getComputedStyle(this.canvas).getPropertyValue('height'));
   },
   addObject: function(prefix, object) {
-    var item = this.objectList.children.namedItem(object.id);
-    var itemList;
+    let item = this.objectList.children.namedItem(object.id);
+    let itemList;
     if (item) {
       itemList = item.children[1];
     }
     else {
       item = document.createElement("li");
-      var div = document.createElement("div");
-      var text = document.createTextNode(prefix + object.toString());
+      let div = document.createElement("div");
+      let text = document.createTextNode(prefix + object.toString());
 
       item.id = object.id;
 
@@ -231,7 +231,7 @@ var ui = {
     if (object.children) {
       object.children.forEach(c => {
         if (!itemList.children.namedItem(c.id)) {
-          var subItem = document.createElement("li");
+          let subItem = document.createElement("li");
           subItem.id = c.id;
           subItem.appendChild(document.createTextNode("Vector " + c.toString()));
           itemList.appendChild(subItem);
@@ -241,16 +241,16 @@ var ui = {
     }
   },
   wireUpButtons: function() {
-    for (var i = 0; i < ui.buttons.length; i++) {
-      var button = ui.buttons[i];
+    for (let i = 0; i < ui.buttons.length; i++) {
+      let button = ui.buttons[i];
       button.addEventListener('mousedown', e => {
         settings.mode = (<HTMLButtonElement> e.target).getAttribute('value').toLowerCase();
       });
     }
   },
   wireUpCheckboxes: function() {
-    for (var i = 0; i < this.checkboxes.length; i++) {
-      var checkbox = this.checkboxes[i];
+    for (let i = 0; i < this.checkboxes.length; i++) {
+      let checkbox = this.checkboxes[i];
       // set the checkbox to reflect default setting values
       checkbox.checked = settings[checkbox.getAttribute('value')];
 
@@ -272,11 +272,11 @@ var ui = {
     this.wireUpCheckboxes();
   }
 };
-var commands = {
+let commands = {
   getVectorFromMouse: function(mouse) {
-    var vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+    let vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
     if (settings.selecting && selections.getSelected().length) {
-      var lastSelected = selections.lastSelected();
+      let lastSelected = selections.lastSelected();
       if (lastSelected &&
         lastSelected.distanceTo(vector) <= settings.selectRadius) {
         if (lastSelected.constructor.name === Vector.name) {
@@ -288,7 +288,7 @@ var commands = {
             lastSelected.constructor.name === Arc.name) {
             vector = lastSelected.pointClosestTo(vector);
 
-            var existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+            let existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
             if (existingVector) {
               vector = existingVector;
             }
@@ -309,9 +309,9 @@ var commands = {
   },
   segment: function(mouse, keys) {
     if (settings.mode === 'segment') {
-      var vector = commands.getVectorFromMouse(mouse);
+      let vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
-      var command = log.getLastCommand();
+      let command = log.getLastCommand();
       if (!command || command.constructor.name !== SegmentCreation.name || command.finished) {
         command = new SegmentCreation();
         log.logCommand(command);
@@ -335,9 +335,9 @@ var commands = {
   },
   line: function(mouse, keys) {
     if (settings.mode === 'line') {
-      var vector = commands.getVectorFromMouse(mouse);
+      let vector = commands.getVectorFromMouse(mouse);
       plane.addTempVector(vector);
-      var command = log.getLastCommand();
+      let command = log.getLastCommand();
       if (!command || command.constructor.name !== LineCreation.name || command.finished) {
         command = new LineCreation();
         log.logCommand(command);
@@ -368,23 +368,23 @@ var commands = {
       ui.clearProps();
 
       // get canvas pos of mouse click
-      var pos = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+      let pos = canvasToGrid(new Vector(mouse.downX, mouse.downY));
 
       // get vector within required radius of the mouse click
-      var vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
+      let vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
 
       if (vector) {
         selections.addToGroup(vector);
         ui.updateVectorProps(vector);
       }
       else {
-        var line = plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
+        let line = plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
         if (line) {
           selections.addToGroup(line);
           ui.updateLineProps(line);
         }
         else {
-          var arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
+          let arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
           if (arc) {
             selections.addToGroup(arc);
           }
@@ -394,14 +394,14 @@ var commands = {
   },
   vector: function(mouse) {
     if (settings.mode === 'vector') {
-      var vector = commands.getVectorFromMouse(mouse);
+      let vector = commands.getVectorFromMouse(mouse);
       plane.addVector(vector);
       ui.addObject("Vector ", vector);
     }
   },
   move: function(mouse) {
     if (settings.mode === 'move' && mouse.down) {
-      var translation = new Vector(mouse.deltaX, -mouse.deltaY);
+      let translation = new Vector(mouse.deltaX, -mouse.deltaY);
       selections.getSelected().forEach(obj => {
         if (settings.logToConsole) {
           console.log("|\n|---Object " + obj.id + " being translated---\n|");
@@ -411,7 +411,7 @@ var commands = {
       });
 
 
-      /*var v = plane.getVector(settings.selected[0]);
+      /*let v = plane.getVector(settings.selected[0]);
       if (v) {
         if (settings.logToConsole) {
           console.log("|\n|---Vector " + v.id + " being translated---\n|");
@@ -420,7 +420,7 @@ var commands = {
         log.objectCommands++; // TODO
       }
       else {
-        var l = plane.getLine(settings.selected[0]);
+        let l = plane.getLine(settings.selected[0]);
         if (l) {
           if (settings.logToConsole) {
             console.log("|\n|---Line " + l.id + " being translated---\n|");
@@ -462,14 +462,14 @@ var commands = {
     console.log("HOYA");
     if (settings.mode === 'fix')
     {
-      var v = plane.getVector(settings.selected[0]);
+      let v = plane.getVector(settings.selected[0]);
       if (v) {
         v.constraints.fixed = !v.constraints.fixed;
       }
     }
   }
 };
-var log = {
+let log = {
   transformations: [],
   log: function(transformation) {
     this.transformations.push(transformation);
@@ -506,14 +506,14 @@ class Grid {
     minY *= perPixel / 100;
     maxX *= perPixel / 100;
     maxY *= perPixel / 100;
-    var scale = gridGap * perPixel / 100;
+    let scale = gridGap * perPixel / 100;
     if (this.gridGap !== gridGap) {
       this.gridGap = gridGap;
 
       this.lines.splice(0);
 
       // reset boundaries so all lines are redrawn
-      var mean = (minX + maxX) / 2;
+      let mean = (minX + maxX) / 2;
 
       this.minX = mean;
       this.maxX = mean;
@@ -533,20 +533,20 @@ class Grid {
     }
     this.lines = this.lines.filter(l => l.getSlope() == Infinity && (l.p1.x >= minX && l.p1.x <= maxX) || l.getSlope() == 0 && (l.p1.y >= minY && l.p1.y <= maxY));
     // add lines from new minX to old minX
-    for (var x = Math.ceil(minX / scale); x < Math.ceil(this.minX / scale); x++) {
+    for (let x = Math.ceil(minX / scale); x < Math.ceil(this.minX / scale); x++) {
       this.lines.push(new Line(new Vector(x * scale, minY - scale), new Vector(x * scale, maxY + scale)));
     }
     // add lines from new maxX to old maxX
-    for (var x = Math.floor(maxX / scale); x > Math.floor(this.maxX / scale); x--) {
+    for (let x = Math.floor(maxX / scale); x > Math.floor(this.maxX / scale); x--) {
       this.lines.push(new Line(new Vector(x * scale, minY - scale), new Vector(x * scale, maxY + scale)));
     }
 
     // add lines from new minY to old minY
-    for (var y = Math.ceil(minY / scale); y < Math.ceil(this.minY / scale); y++) {
+    for (let y = Math.ceil(minY / scale); y < Math.ceil(this.minY / scale); y++) {
       this.lines.push(new Line(new Vector(minX - scale, y * scale), new Vector(maxX + scale, y * scale)));
     }
     // add lines from new maxY to old maxY
-    for (var y = Math.floor(maxY / scale); y > Math.floor(this.maxY / scale); y--) {
+    for (let y = Math.floor(maxY / scale); y > Math.floor(this.maxY / scale); y--) {
       this.lines.push(new Line(new Vector(minX - scale, y * scale), new Vector(maxX + scale, y * scale)));
     }
     this.minX = minX;
@@ -702,16 +702,16 @@ class Arc extends DimensionalObject {
       x4 = x3 +- h(y2 - y1) / d
       y4 = y3 +- h(x2 - x1) / d
       */
-    var c1 = this.center;
-    var c2 = arc.center;
-    var d = c2.distanceTo(c1);
-    var d1 = (sqr(d) + sqr(this.getRadius()) - sqr(arc.getRadius())) / (2 * d);
+    let c1 = this.center;
+    let c2 = arc.center;
+    let d = c2.distanceTo(c1);
+    let d1 = (sqr(d) + sqr(this.getRadius()) - sqr(arc.getRadius())) / (2 * d);
 
-    var intToIntsMP = Math.sqrt(sqr(this.getRadius()) - sqr(d1));
-    var intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
+    let intToIntsMP = Math.sqrt(sqr(this.getRadius()) - sqr(d1));
+    let intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
 
-    var int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
-    var int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+    let int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
+    let int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
 
     if (!int1.equals(int2)) {
       return new Locus([int1, int2]);
@@ -727,23 +727,23 @@ class Arc extends DimensionalObject {
     return new Arc(this.angle.dilated(center, factor));
   }
   receive(transformation) {
-    var existingExclusions = [];
+    let existingExclusions = [];
     if (transformation.args && transformation.args.exclude) {
       existingExclusions = transformation.args.exclude;
     }
-    var fixedTo = this.constraints.fixedTo;
+    let fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
         if (transformation.object == this.center) {
-          var translation = transformation;
+          let translation = transformation;
 
           log.broadcast(new Translation(this, translation.vector,
             {preImage: this, exclude: existingExclusions.concat([translation.object])}));
 
         }
         else {
-          var dilation = transformation;
-          var prevRadius = dilation.getPreImage().distanceTo(this.center);
-          var newRadius = dilation.getImage().distanceTo(this.center);
+          let dilation = transformation;
+          let prevRadius = dilation.getPreImage().distanceTo(this.center);
+          let newRadius = dilation.getImage().distanceTo(this.center);
           log.broadcast(new Dilation(this, this.center, newRadius / prevRadius,
             {exclude: existingExclusions.concat([dilation.object]), preImage: this}))
         }
@@ -751,15 +751,15 @@ class Arc extends DimensionalObject {
 
   }
   getLineIntersection(line) {
-    var distToCenter = line.distanceTo(this.center);
+    let distToCenter = line.distanceTo(this.center);
     if (lessOrEqual(distToCenter, this.getRadius())) {
-      var chordMidpoint = line.extended().pointClosestTo(this.center);
-      var halfChordLength = Math.sqrt(this.getRadius() * this.getRadius() - distToCenter * distToCenter);
+      let chordMidpoint = line.extended().pointClosestTo(this.center);
+      let halfChordLength = Math.sqrt(this.getRadius() * this.getRadius() - distToCenter * distToCenter);
 
-      var slopeVector = new Vector(1, line.getSlope()).normalize();
-      var int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
-      var int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
-      var ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
+      let slopeVector = new Vector(1, line.getSlope()).normalize();
+      let int1 = chordMidpoint.add(slopeVector.multiply(halfChordLength));
+      let int2 = chordMidpoint.subtract(slopeVector.multiply(halfChordLength));
+      let ints = [int1, int2].filter(int => this.containsPoint(int) && line.onLine(int));
       if (ints.length == 1) {
         return ints[0];
       }
@@ -777,7 +777,7 @@ class Arc extends DimensionalObject {
   }
   pointClosestTo(vector) {
     if (this.angle.inside(vector)) {
-      var direction = vector.subtract(this.center).normalize();
+      let direction = vector.subtract(this.center).normalize();
       console.log(direction);
       return this.center.add(direction.multiply(this.getRadius()));
     }
@@ -870,7 +870,7 @@ class Angle extends GeomObject {
     return (Math.PI * 2 + angle) % (Math.PI * 2);
   }
   inside(vector) {
-    var vectorAngle = vector.rotated(this.vertex, -this.getStartAngle()).angle(this.vertex);
+    let vectorAngle = vector.rotated(this.vertex, -this.getStartAngle()).angle(this.vertex);
     return vectorAngle > 0 && vectorAngle < this.getMeasure();
   }
   getMeasure() {
@@ -922,10 +922,10 @@ class Vector extends GeomObject {
       14, 20);
   };
   angle(center?) {
-    var x;
-    var y;
+    let x;
+    let y;
     if (center) {
-      var relativeVector = this.subtract(center);
+      let relativeVector = this.subtract(center);
       x = relativeVector.x;
       y = relativeVector.y;
     }
@@ -933,8 +933,8 @@ class Vector extends GeomObject {
       x = this.x;
       y = this.y;
     }
-    var refAngle = Math.abs(Math.atan(y / x));
-    var angle = refAngle;
+    let refAngle = Math.abs(Math.atan(y / x));
+    let angle = refAngle;
     if (x < 0 && y > 0) {
       angle = Math.PI - refAngle;
     }
@@ -947,8 +947,8 @@ class Vector extends GeomObject {
     return angle;
   };
   translate(vector, translation?) {
-    var image = this.add(vector);
-    var fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
+    let image = this.add(vector);
+    let fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
 
     // if a parent is trying to translate, let this act as if fixed to its image
     // instead to prevent a conflict
@@ -961,16 +961,16 @@ class Vector extends GeomObject {
     if (fixedTo.length) {
       // try to translate to the closest intersection of all parents
       // if there is no intersection, then this point can't move anywhere
-      var intersection = new Locus(fixedTo).getSelfIntersection();//fixedTo[0].getIntersection(fixedTo.slice(1));
+      let intersection = new Locus(fixedTo).getSelfIntersection();//fixedTo[0].getIntersection(fixedTo.slice(1));
       if (intersection) {
         image = intersection.pointClosestTo(image);
       }
       //image = intersection ? image.getClosest(intersection) : this;
     }
-    var displacement = image.subtract(this);
+    let displacement = image.subtract(this);
     this.setPosition(image);
     if (translation) {
-      var exclude = [translation.object];
+      let exclude = [translation.object];
       if (translation.args && translation.args.exclude) {
         exclude = exclude.concat(translation.args.exclude);
       }
@@ -983,7 +983,7 @@ class Vector extends GeomObject {
   dilate(center, factor, dilation) {
     this.setPosition(this.dilated(center, factor));
     if (dilation) {
-      var exclude = [dilation.object];
+      let exclude = [dilation.object];
       if (dilation.args && dilation.args.exclude) {
         exclude = exclude.concat(dilation.args.exclude);
       }
@@ -997,20 +997,20 @@ class Vector extends GeomObject {
     return this.subtract(center).multiply(factor).add(center);
   }
   receive(transformation) {
-    var fixedTo = this.constraints.fixedTo;
+    let fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object) /*&& !this.received.some(t => t.similarTo(transformation))*/) {
       if (transformation.name === 'translation') {
-        var translation = transformation;
+        let translation = transformation;
         this.translate(translation.vector, translation);
       }
       if (transformation.name === 'rotation') {
-        var rotation = transformation;
+        let rotation = transformation;
         if (!rotation.center.equals(this)) {
           this.rotate(rotation.center, rotation.radians, rotation);
         }
       }
       if (transformation.name === 'dilation') {
-        var dilation = transformation;
+        let dilation = transformation;
         if (!dilation.center.equals(this)) {
           this.dilate(transformation.center, transformation.factor, dilation);
         }
@@ -1037,7 +1037,7 @@ class Vector extends GeomObject {
   }
   setPosition(vector, callers?) {
     if (callers) {
-      /*var initial = this.clone();
+      /*let initial = this.clone();
       this.parents.forEach(p => {
         if (callers.includes(p)) {
           this.x = vector.x;
@@ -1059,7 +1059,7 @@ class Vector extends GeomObject {
   rotate(center, radians, rotation) {
     this.setPosition(this.rotated(center, radians));
     if (rotation) {
-      var exclude = [rotation.object];
+      let exclude = [rotation.object];
       if (rotation.args && rotation.args.exclude) {
         exclude = exclude.concat(rotation.args.exclude);
       }
@@ -1070,8 +1070,8 @@ class Vector extends GeomObject {
     }
   }
   rotated(center, radians) {
-    var relativeVector = this.subtract(center);
-    var angleSum = relativeVector.angle() + radians;
+    let relativeVector = this.subtract(center);
+    let angleSum = relativeVector.angle() + radians;
     if (!isNaN(angleSum)) {
       return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
     }
@@ -1117,7 +1117,7 @@ class Vector extends GeomObject {
     return equal(this.x, vector.x) && equal(this.y, vector.y);
   }
   clone(id?: number) {
-    var clone = new Vector(this.x, this.y);
+    let clone = new Vector(this.x, this.y);
     clone.setId(id);
     return clone;
   }
@@ -1149,31 +1149,31 @@ class LineSegment extends LinearObject {
     return this.p1.add(this.p2).divide(2);
   };
   receive(transformation) {
-    var fixedTo = this.constraints.fixedTo;
+    let fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
-        var translation = transformation;
+        let translation = transformation;
 
         // p1 isn't the translated vector; p2 is the translated vector before translation
-        var preImagePoint = translation.getPreImage();
-        var otherEndpoint = [this.p1, this.p2].filter(p => p !== translation.object)[0].clone();
-        var preImageMidpoint = new LineSegment(otherEndpoint, preImagePoint).midpoint();
+        let preImagePoint = translation.getPreImage();
+        let otherEndpoint = [this.p1, this.p2].filter(p => p !== translation.object)[0].clone();
+        let preImageMidpoint = new LineSegment(otherEndpoint, preImagePoint).midpoint();
 
         // the rotation center will be the reflection of the preimage translated point in the midpoint
-        var vectorToMidpoint = preImagePoint.subtract(preImageMidpoint);
-        var center = preImageMidpoint.subtract(vectorToMidpoint);
+        let vectorToMidpoint = preImagePoint.subtract(preImageMidpoint);
+        let center = preImageMidpoint.subtract(vectorToMidpoint);
 
-        var oldAngle = preImagePoint.angle(otherEndpoint);
-        var newAngle = translation.getImage().angle(otherEndpoint);
-        var angle = newAngle - oldAngle;
+        let oldAngle = preImagePoint.angle(otherEndpoint);
+        let newAngle = translation.getImage().angle(otherEndpoint);
+        let angle = newAngle - oldAngle;
 
-        var existingExclusions = [];
+        let existingExclusions = [];
         if (transformation.args && transformation.args.exclude) {
           existingExclusions = transformation.args.exclude;
         }
-        var rotation = new Rotation(this, center, angle, {exclude: [translation.object].concat(existingExclusions), preImage: this});
-        var distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
-        var endpoint = translation.getPreImage().rotated(center, angle);
-        var dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object].concat(existingExclusions), preImage: this});
+        let rotation = new Rotation(this, center, angle, {exclude: [translation.object].concat(existingExclusions), preImage: this});
+        let distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
+        let endpoint = translation.getPreImage().rotated(center, angle);
+        let dilation = new Dilation(this, center, this.length() / (this.length() - distance), {exclude: [translation.object].concat(existingExclusions), preImage: this});
 
         log.broadcast(rotation);
         log.broadcast(dilation);
@@ -1186,11 +1186,11 @@ class LineSegment extends LinearObject {
     if (arguments.length === 0) {
       return new Line(this.p1.clone(), this.p2.clone());
     }
-    var otherEndpoint = [this.p1, this.p2].filter(p => p !== endpoint)[0];
-    var slopeVector = endpoint.subtract(otherEndpoint).normalize();
-    var translation = slopeVector.multiply(distance);
+    let otherEndpoint = [this.p1, this.p2].filter(p => p !== endpoint)[0];
+    let slopeVector = endpoint.subtract(otherEndpoint).normalize();
+    let translation = slopeVector.multiply(distance);
 
-    var p1, p2;
+    let p1, p2;
     if (this.p1 === endpoint) {
       p1 = endpoint.add(translation);
       p2 = otherEndpoint.clone();
@@ -1202,7 +1202,7 @@ class LineSegment extends LinearObject {
     return new LineSegment(p1, p2);
   };
   rotated(center, radians) {
-    var endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
+    let endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
     return new LineSegment(endpoints[0], endpoints[1]);
   };
   dilated(center: Vector, factor: number) {
@@ -1235,7 +1235,7 @@ class LineSegment extends LinearObject {
     return undefined;
   };
   perpThrough(vector: Vector): Line {
-    var perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
+    let perp = new Line({slope: -1 / this.getSlope(), p: vector.clone()});
 
     if (this.getLineIntersection(perp)) {
       return perp;
@@ -1243,7 +1243,7 @@ class LineSegment extends LinearObject {
     return undefined;
   };
   distanceTo(vector) {
-    var perp = this.perpThrough(vector);
+    let perp = this.perpThrough(vector);
     if (perp) {
       return vector.subtract(this.getLineIntersection(this.perpThrough(vector))).magnitude();
     }
@@ -1252,7 +1252,7 @@ class LineSegment extends LinearObject {
     }
   };
   pointClosestTo(vector: Vector): Vector {
-    var perp = this.perpThrough(vector);
+    let perp = this.perpThrough(vector);
     if (perp) {
       return <Vector> this.getLineIntersection(perp);
     }
@@ -1285,7 +1285,7 @@ class LineSegment extends LinearObject {
     * x = (b - y + mx1 - nx2) / (m - n)
     */
     if (this.getSlope() !== line.getSlope()) {
-      var x;
+      let x;
       if (Math.abs(this.getSlope()) === Infinity) {
         x = this.p1.x;
         let y = line.getY(x);
@@ -1296,7 +1296,7 @@ class LineSegment extends LinearObject {
       }
       else if (Math.abs(line.getSlope()) === Infinity) {
         x = line.p1.x;
-        var y = this.getY(x);
+        let y = this.getY(x);
 
         if (y !== undefined && (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y)) {
           return new Vector(x, y);
@@ -1371,7 +1371,7 @@ class Line extends LinearObject {
   }
   constructor(p1, p2?) {
     if (!p2) {
-      var args = p1;
+      let args = p1;
       if (args.slope !== undefined && args.p !== undefined) {
         p1 = args.p;
         p2 = args.p.add(new Vector(1, args.slope));
@@ -1444,7 +1444,7 @@ class Line extends LinearObject {
     return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
   }
   getLineIntersection(line) {
-    var x;
+    let x;
     if (this.getSlope() != line.getSlope()) {
       // handle vertical lines
       if (Math.abs(this.getSlope()) == Infinity) {
@@ -1480,12 +1480,12 @@ class Line extends LinearObject {
     * mx - nx = b - nx2 + mx1 - y
     * x = (b - y + mx1 - nx2) / (m - n)
     */
-    /*var objs = [];
+    /*let objs = [];
     if (Array.isArray(obj)) {
       objs = obj.concat([this]);
       obj = objs[0];
     }
-    var intersection;
+    let intersection;
 
     if (obj.constructor.name === LineSegment.name ||
       obj.constructor.name === Line.name) {
@@ -1677,23 +1677,23 @@ class Camera {
     this.gridGap = 50;
   }
   drawLines(lines, gridColors?) {
-    var color = settings.lineColor;
+    let color = settings.lineColor;
 
-    var offset = this.min.negative();
+    let offset = this.min.negative();
 
     // set the boundaries of the grid
-    var boundaryX1 = new LineSegment
+    let boundaryX1 = new LineSegment
     (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.minY));
-    var boundaryX2 = new LineSegment
+    let boundaryX2 = new LineSegment
     (new Vector(this.plane.grid.minX, this.plane.grid.maxY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
-    var boundaryY1 = new LineSegment
+    let boundaryY1 = new LineSegment
     (new Vector(this.plane.grid.minX, this.plane.grid.minY), new Vector(this.plane.grid.minX, this.plane.grid.maxY));
-    var boundaryY2 = new LineSegment
+    let boundaryY2 = new LineSegment
     (new Vector(this.plane.grid.maxX, this.plane.grid.minY), new Vector(this.plane.grid.maxX, this.plane.grid.maxY));
 
     lines.forEach(l => {
       if (gridColors) {
-        var dPlaces = settings.displayPlaces;
+        let dPlaces = settings.displayPlaces;
         // if y-axis, set to y-axis color
         if (roundFromZero(l.p1.x, dPlaces) === 0 && roundFromZero(l.p2.x, dPlaces) === 0) {
           color = gridColors.x;
@@ -1708,7 +1708,7 @@ class Camera {
         }
       }
       // store points of new LineSegment that will be drawn
-      var points = [];
+      let points = [];
       // iterate over each endpoint of the line
       [l.p1, l.p2].forEach(p => {
         // if the line extends beyond the camera, use an intersection with the camera instead
@@ -1730,7 +1730,7 @@ class Camera {
         points.push(p);
       });
       if (points[0] && points[1]) {
-          var thickness = settings.lineThickness;
+          let thickness = settings.lineThickness;
           if (gridColors) {
             thickness = settings.gridThickness;
           }
@@ -1741,7 +1741,7 @@ class Camera {
           new LineSegment(points[0], points[1]).draw(offset, color, 100 / this.perPixel, thickness);
           // if grid line
           if (gridColors) {
-            var dPlaces = settings.displayPlaces;
+            let dPlaces = settings.displayPlaces;
             ctx.fillStyle = '#eee';
             // if horizontal, write y-coordinate along the y-axis
             if (l.getSlope() == 0) {
@@ -1766,7 +1766,7 @@ class Camera {
     arcs.forEach(a => this.drawArc(a));
   }
   drawArc(arc) {
-    var thickness = (selections.isSelected(arc) ? settings.selectedThickness : settings.lineThickness);
+    let thickness = (selections.isSelected(arc) ? settings.selectedThickness : settings.lineThickness);
     arc.draw(this.min.negative(), 100 / this.perPixel, settings.lineColor, thickness);
   }
 
@@ -1824,7 +1824,7 @@ class Camera {
   };
   drawVector(v) {
       if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
-        var radius = settings.pointRadius;
+        let radius = settings.pointRadius;
         if (selections.isSelected(v)) {
           radius = settings.selectedRadius;
         }
@@ -1898,28 +1898,28 @@ class Plane {
 }
 ui.init();
 
-var ctx = ui.canvas.getContext('2d');
+let ctx = ui.canvas.getContext('2d');
 ctx.strokeStyle = '#99ff00';
 
-var keyboard = new Keyboard();
-var mouse = new Mouse();
+let keyboard = new Keyboard();
+let mouse = new Mouse();
 
-var grid = new Grid();
-var plane = new Plane(grid);
-var cam = new Camera(-ui.canvasCSSWidth() / 2, -ui.canvasCSSHeight() / 2, ui.canvasCSSWidth() / 2, ui.canvasCSSHeight() / 2, plane);
+let grid = new Grid();
+let plane = new Plane(grid);
+let cam = new Camera(-ui.canvasCSSWidth() / 2, -ui.canvasCSSHeight() / 2, ui.canvasCSSWidth() / 2, ui.canvasCSSHeight() / 2, plane);
 log.plane = plane;
 // update canvas when resized
 new ResizeSensor(ui.canvasWrapper, function() {
   // store old and new dimensions to calculate delta
-  var newWidth = ui.canvasCSSWidth();
-  var newHeight = ui.canvasCSSHeight();
-  var oldWidth = ui.canvas.width;
-  var oldHeight = ui.canvas.height;
+  let newWidth = ui.canvasCSSWidth();
+  let newHeight = ui.canvasCSSHeight();
+  let oldWidth = ui.canvas.width;
+  let oldHeight = ui.canvas.height;
 
-  var deltaMinX = -(newWidth - oldWidth) * (1 - settings.rescaleWeightX);
-  var deltaMinY = -(newHeight - oldHeight) * (1 - settings.rescaleWeightY);
-  var deltaMaxX = (newWidth - oldWidth) * settings.rescaleWeightX;
-  var deltaMaxY = (newHeight - oldHeight) * settings.rescaleWeightY;
+  let deltaMinX = -(newWidth - oldWidth) * (1 - settings.rescaleWeightX);
+  let deltaMinY = -(newHeight - oldHeight) * (1 - settings.rescaleWeightY);
+  let deltaMaxX = (newWidth - oldWidth) * settings.rescaleWeightX;
+  let deltaMaxY = (newHeight - oldHeight) * settings.rescaleWeightY;
 
   ui.canvas.width = newWidth;
   ui.canvas.height = newHeight;
@@ -2140,9 +2140,9 @@ class Locus extends GeomObject {
     }
   }
   getSingleObjIntersection(obj) {
-    var ints: GeomObject[] = [];
+    let ints: GeomObject[] = [];
     this.set.forEach(setObj => {
-      var intersection;
+      let intersection;
       if (setObj.constructor.name === Vector.name) {
         if (obj.containsPoint(setObj)) {
           intersection = setObj.clone();
@@ -2169,7 +2169,7 @@ class Locus extends GeomObject {
     cur.distanceTo(vector) < closest.distanceTo(vector) ? cur : closest);
   }
   getLocusIntersection(locus) {
-    var intSet = [];
+    let intSet = [];
     this.set.forEach(obj => {
       intSet.push(locus.getIntersection(obj));
     });
@@ -2179,8 +2179,8 @@ class Locus extends GeomObject {
     if (this.set.length === 1) {
       return this.set[0];
     }
-    var singleObjInts = new Locus(this.set.slice(1)).getSingleObjIntersection(this.set[0]).get();
-    var intsSharedByAll = singleObjInts.filter(int => this.set.every(obj => obj.getIntersection(int)));
+    let singleObjInts = new Locus(this.set.slice(1)).getSingleObjIntersection(this.set[0]).get();
+    let intsSharedByAll = singleObjInts.filter(int => this.set.every(obj => obj.getIntersection(int)));
     if (intsSharedByAll.length) {
       return new Locus(intsSharedByAll);
     }
@@ -2189,7 +2189,7 @@ class Locus extends GeomObject {
 }
 
 mouse.onWheel(mouse => {
-  var sensitivity = 10;
+  let sensitivity = 10;
   cam.scaleContent((cam.dilation + Math.max(Math.min(mouse.deltaWheel * sensitivity, 200 - cam.dilation), 50 - cam.dilation)) / cam.dilation, new Vector(-mouse.wheelX, -mouse.wheelY).subtract(cam.min));
 }, 0);
 mouse.onMove(commands.pan, 0);
@@ -2214,7 +2214,7 @@ function Keyboard() {
   document.addEventListener('keydown', e => {
     this.keys[e.key.toLowerCase()] = true;
 
-    for (var key in this.downFunctions) {
+    for (let key in this.downFunctions) {
       if (this.downFunctions.hasOwnProperty(key) && key.split(' ').includes(e.key.toLowerCase())) {
         if (key.split(' ').every(key => this.keys[key])) {
           this.downFunctions[key].forEach(f => f());
@@ -2251,8 +2251,8 @@ function Mouse() {
   this.wheelFunctions = [];
 
   document.addEventListener('mousemove', e => {
-    var newX = e.clientX - ui.canvasOffsetX();
-    var newY = e.clientY;
+    let newX = e.clientX - ui.canvasOffsetX();
+    let newY = e.clientY;
 
     this.mouse.deltaX = newX - this.mouse.x;
     this.mouse.deltaY = newY - this.mouse.y;
@@ -2324,7 +2324,7 @@ function floorTowardZero(n) {
   return (Math.floor(Math.abs(n)) * Math.round(Math.abs(n) / n)) || 0;
 }
 function roundFromZero(n, dPlaces = 0) {
-  var factor = Math.pow(10, dPlaces);
+  let factor = Math.pow(10, dPlaces);
   n *= factor;
 
   return (Math.round(Math.abs(n)) * Math.round(Math.abs(n) / n)) / factor || 0;
@@ -2333,7 +2333,7 @@ function sqr(x) {
   return x * x;
 }
 function canvasToGrid(vector) {
-  var v = vector.add(cam.min).multiply(cam.perPixel / 100);
+  let v = vector.add(cam.min).multiply(cam.perPixel / 100);
   v.y *= -1;
   return v;
 }
