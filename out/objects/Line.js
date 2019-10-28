@@ -54,7 +54,7 @@ class Line extends LinearObject {
         return this.getSlope() * (x - this.p1.x) + this.p1.y;
     }
     onLine(vector) {
-        return equal(this.getX(vector.y), vector.x) || equal(this.getY(vector.x), vector.y);
+        return utils.equal(this.getX(vector.y), vector.x) || utils.equal(this.getY(vector.x), vector.y);
     }
     perpThrough(vector) {
         return new Line({ slope: -1 / this.getSlope(), p: vector.clone() });
@@ -73,8 +73,8 @@ class Line extends LinearObject {
         offset = offset || new Vector(0, 0);
         ctx.strokeStyle = color;
         ctx.beginPath();
-        ctx.moveTo(roundFromZero(this.p1.x * dilation + offset.x), roundFromZero(-this.p1.y * dilation + offset.y));
-        ctx.lineTo(roundFromZero(this.p2.x * dilation + offset.x), roundFromZero(-this.p2.y * dilation + offset.y));
+        ctx.moveTo(utils.roundFromZero(this.p1.x * dilation + offset.x), utils.roundFromZero(-this.p1.y * dilation + offset.y));
+        ctx.lineTo(utils.roundFromZero(this.p2.x * dilation + offset.x), utils.roundFromZero(-this.p2.y * dilation + offset.y));
         ctx.stroke();
         ctx.translate(-.5, -.5);
     }
@@ -198,7 +198,7 @@ class Line extends LinearObject {
         }
     }
     detailsString() {
-        return `\(\(${roundFromZero(this.p1.x, 2)}, ${roundFromZero(this.p1.y, 2)}\), \(${roundFromZero(this.p2.x, 2)}, ${roundFromZero(this.p2.y, 2)}\)\)`;
+        return `\(\(${utils.roundFromZero(this.p1.x, 2)}, ${utils.roundFromZero(this.p1.y, 2)}\), \(${utils.roundFromZero(this.p2.x, 2)}, ${utils.roundFromZero(this.p2.y, 2)}\)\)`;
     }
     toString() {
         return `${this.nameString()} ${this.detailsString()}`;

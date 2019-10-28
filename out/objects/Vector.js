@@ -20,9 +20,9 @@ class Vector extends GeomObject {
         offset = offset || new Vector(0, 0);
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(roundFromZero(this.x * dilation + offset.x), roundFromZero(-this.y * dilation + offset.y), radius, 0, 2 * Math.PI, true);
+        ctx.arc(utils.roundFromZero(this.x * dilation + offset.x), utils.roundFromZero(-this.y * dilation + offset.y), radius, 0, 2 * Math.PI, true);
         ctx.fill();
-        ctx.fillText(`${this.id}`, roundFromZero(this.x * dilation + offset.x) - settings.pointRadius / 2, roundFromZero(-this.y * dilation + offset.y) - settings.pointRadius / 2 +
+        ctx.fillText(`${this.id}`, utils.roundFromZero(this.x * dilation + offset.x) - settings.pointRadius / 2, utils.roundFromZero(-this.y * dilation + offset.y) - settings.pointRadius / 2 +
             14, 20);
     }
     ;
@@ -206,10 +206,10 @@ class Vector extends GeomObject {
         return new Vector(this.x / this.magnitude(), this.y / this.magnitude());
     }
     floorTowardZero() {
-        return new Vector(floorTowardZero(this.x), floorTowardZero(this.y));
+        return new Vector(utils.floorTowardZero(this.x), utils.floorTowardZero(this.y));
     }
     roundFromZero(dPlaces) {
-        return new Vector(roundFromZero(this.x, dPlaces), roundFromZero(this.y, dPlaces));
+        return new Vector(utils.roundFromZero(this.x, dPlaces), utils.roundFromZero(this.y, dPlaces));
     }
     negative() {
         return new Vector(-this.x, -this.y);
@@ -218,7 +218,7 @@ class Vector extends GeomObject {
         return Math.sqrt(this.x * this.x + this.y * this.y);
     }
     equals(vector) {
-        return equal(this.x, vector.x) && equal(this.y, vector.y);
+        return utils.equal(this.x, vector.x) && utils.equal(this.y, vector.y);
     }
     clone(id) {
         let clone = new Vector(this.x, this.y);
@@ -234,7 +234,7 @@ class Vector extends GeomObject {
         }
     }
     detailsString() {
-        return `\(${roundFromZero(this.x, 2)}, ${roundFromZero(this.y, 2)}\)`;
+        return `\(${utils.roundFromZero(this.x, 2)}, ${utils.roundFromZero(this.y, 2)}\)`;
     }
     toString() {
         return `${this.nameString()} ${this.detailsString()}`;

@@ -23,9 +23,6 @@ new ResizeSensor(ui.canvasWrapper, function () {
     cam.resize(deltaMinX, deltaMinY, deltaMaxX, deltaMaxY);
     cam.update();
 });
-plane.addVector(new Vector(50, 0));
-plane.addVector(new Vector(0, 0));
-plane.addVector(new Vector(0, 50));
 cam.update();
 mouse.onWheel(mouse => {
     let sensitivity = 10;
@@ -45,31 +42,6 @@ mouse.onWheel(cam.update.bind(cam), 2);
 keyboard.onDown("tab", function (keys) {
     selections.groupNum++;
 });
-function equal(x, y) {
-    return Math.abs(x - y) <= settings.tolerance;
-}
-function lessOrEqual(x, y) {
-    return x < y || equal(x, y);
-}
-function getSign(n) {
-    return Math.abs(n) / n || 0;
-}
-function floorTowardZero(n) {
-    return (Math.floor(Math.abs(n)) * Math.round(Math.abs(n) / n)) || 0;
-}
-function roundFromZero(n, dPlaces = 0) {
-    let factor = Math.pow(10, dPlaces);
-    n *= factor;
-    return (Math.round(Math.abs(n)) * Math.round(Math.abs(n) / n)) / factor || 0;
-}
-function sqr(x) {
-    return x * x;
-}
-function canvasToGrid(vector) {
-    let v = vector.add(cam.min).multiply(cam.perPixel / 100);
-    v.y *= -1;
-    return v;
-}
-function flattenArray(arr) {
-    return arr.reduce((flat, item) => Array.isArray(item) ? flat.concat(item) : flat.concat([item]), []);
-}
+plane.addVector(new Vector(50, 0));
+plane.addVector(new Vector(0, 0));
+plane.addVector(new Vector(0, 50));

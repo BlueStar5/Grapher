@@ -58,6 +58,6 @@ class Angle extends GeomObject {
     return new Angle(this.p1.clone(), this.vertex.clone(), this.p2.clone());
   }
   equals(angle: Angle): boolean {
-    return equal(this.p1, angle.p1) && equal(this.vertex, angle.vertex) && equal(this.p2, angle.p2);
+    return utils.equal(this.p1, angle.p1) && utils.equal(this.vertex, angle.vertex) && utils.equal(this.p2, angle.p2);
   }
 }

@@ -21,11 +21,11 @@ class Camera {
             if (gridColors) {
                 let dPlaces = settings.displayPlaces;
                 // if y-axis, set to y-axis color
-                if (roundFromZero(l.p1.x, dPlaces) === 0 && roundFromZero(l.p2.x, dPlaces) === 0) {
+                if (utils.roundFromZero(l.p1.x, dPlaces) === 0 && utils.roundFromZero(l.p2.x, dPlaces) === 0) {
                     color = gridColors.x;
                 }
                 // if x-axis, set to x-axis color
-                else if (roundFromZero(l.p1.y, dPlaces) === 0 && roundFromZero(l.p2.y, dPlaces) === 0) {
+                else if (utils.roundFromZero(l.p1.y, dPlaces) === 0 && utils.roundFromZero(l.p2.y, dPlaces) === 0) {
                     color = gridColors.y;
                 }
                 // else, set to grid line color
@@ -71,17 +71,17 @@ class Camera {
                     ctx.fillStyle = '#eee';
                     // if horizontal, write y-coordinate along the y-axis
                     if (l.getSlope() == 0) {
-                        ctx.fillText(`${roundFromZero(l.p1.y, dPlaces)}`, roundFromZero(offset.x), roundFromZero(offset.y - l.p1.y * 100 / this.perPixel), 30);
+                        ctx.fillText(`${utils.roundFromZero(l.p1.y, dPlaces)}`, utils.roundFromZero(offset.x), utils.roundFromZero(offset.y - l.p1.y * 100 / this.perPixel), 30);
                     }
                     // if vertical, write x-coordinate along the x-axis
                     else {
-                        ctx.fillText(`${roundFromZero(l.p1.x, dPlaces)}`, roundFromZero(l.p1.x * 100 / this.perPixel + offset.x), roundFromZero(offset.y), 30);
+                        ctx.fillText(`${utils.roundFromZero(l.p1.x, dPlaces)}`, utils.roundFromZero(l.p1.x * 100 / this.perPixel + offset.x), utils.roundFromZero(offset.y), 30);
                     }
                 }
                 else {
                     ctx.textAlign = "center";
                     ctx.textBaseline = "top";
-                    ctx.fillText(l.id, roundFromZero(l.midpoint().x + offset.x), roundFromZero(-l.midpoint().y + offset.y) + 4, 20);
+                    ctx.fillText(l.id, utils.roundFromZero(l.midpoint().x + offset.x), utils.roundFromZero(-l.midpoint().y + offset.y) + 4, 20);
                     ctx.textAlign = "start";
                     ctx.textBaseline = "alphabetic";
                 }

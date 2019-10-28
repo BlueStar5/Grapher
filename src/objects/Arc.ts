@@ -79,8 +79,8 @@ class Arc extends DimensionalObject {
     let c1 = this.center;
     let c2 = arc.center;
     let d = c2.distanceTo(c1);
-    let d1 = (sqr(d) + sqr(this.getRadius()) - sqr(arc.getRadius())) / (2 * d);
-    let intToIntsMP = Math.sqrt(sqr(this.getRadius()) - sqr(d1));
+    let d1 = (utils.sqr(d) + utils.sqr(this.getRadius()) - utils.sqr(arc.getRadius())) / (2 * d);
+    let intToIntsMP = Math.sqrt(utils.sqr(this.getRadius()) - utils.sqr(d1));
     let intsMP = c1.add(c2.subtract(c1).multiply(d1 / d));
     let int1 = intsMP.add(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
     let int2 = intsMP.subtract(c2.subtract(c1).normal().normalize().multiply(intToIntsMP));
@@ -118,7 +118,7 @@ class Arc extends DimensionalObject {
   }
   getLineIntersection(line) {
     let distToCenter = line.distanceTo(this.center);
-    if (lessOrEqual(distToCenter, this.getRadius())) {
+    if (utils.lessOrEqual(distToCenter, this.getRadius())) {
       let chordMidpoint = line.extended().pointClosestTo(this.center);
       let halfChordLength = Math.sqrt(this.getRadius() * this.getRadius() - distToCenter * distToCenter);
       let slopeVector = new Vector(1, line.getSlope()).normalize();
@@ -137,7 +137,7 @@ class Arc extends DimensionalObject {
     }
   }
   containsPoint(vector) {
-    return this.angle.inside(vector) && equal(vector.distanceTo(this.center), this.getRadius()) ||
+    return this.angle.inside(vector) && utils.equal(vector.distanceTo(this.center), this.getRadius()) ||
       vector.equals(this.angle.p1) || vector.equals(this.angle.p2);
   }
   pointClosestTo(vector) {
@@ -182,7 +182,10 @@ class Arc extends DimensionalObject {
     // ctx.translate(.5, .5);
     offset = offset || new Vector(0, 0);
     ctx.beginPath();
-    ctx.arc(roundFromZero(this.center.x * dilation + offset.x), roundFromZero(-this.center.y * dilation + offset.y), this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
+    ctx.arc(utils.roundFromZero(this.center.x * dilation + offset.x),
+      utils.roundFromZero(-this.center.y * dilation + offset.y),
+      this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(),
+      2 * Math.PI - this.angle.getEndAngle(), true);
     ctx.stroke();
     // ctx.translate(-.5, -.5);
   }

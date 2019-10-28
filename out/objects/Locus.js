@@ -50,7 +50,7 @@ class Locus extends GeomObject {
         return this.set.length === 0;
     }
     flatten() {
-        return flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
+        return utils.flattenArray(this.set.map(obj => obj.constructor.name === Locus.name ? obj.get() : obj));
     }
     union(locus) {
         return new Locus(this.set.concat(locus.get()));

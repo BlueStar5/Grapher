@@ -1,6 +1,6 @@
 let commands = {
     getVectorFromMouse: function (mouse) {
-        let vector = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+        let vector = utils.canvasToGrid(new Vector(mouse.downX, mouse.downY));
         if (settings.selecting && selections.getSelected().length) {
             let lastSelected = selections.lastSelected();
             if (lastSelected &&
@@ -91,7 +91,7 @@ let commands = {
             }
             ui.clearProps();
             // get canvas pos of mouse click
-            let pos = canvasToGrid(new Vector(mouse.downX, mouse.downY));
+            let pos = utils.canvasToGrid(new Vector(mouse.downX, mouse.downY));
             // get vector within required radius of the mouse click
             let vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
             if (vector) {
