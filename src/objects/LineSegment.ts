@@ -30,12 +30,12 @@ class LineSegment extends LinearObject {
       if (transformation.args && transformation.args.exclude) {
         existingExclusions = transformation.args.exclude;
       }
-      let rotation = new Rotation(this, center, angle, { exclude: [translation.object].concat(existingExclusions), preImage: this });
+      //let rotation = new Rotation(this, center, angle, { exclude: [translation.object].concat(existingExclusions), preImage: this });
       let distance = translation.getImage().distanceTo(otherEndpoint) - translation.getPreImage().distanceTo(otherEndpoint);
       let endpoint = translation.getPreImage().rotated(center, angle);
-      let dilation = new Dilation(this, center, this.length() / (this.length() - distance), { exclude: [translation.object].concat(existingExclusions), preImage: this });
-      log.broadcast(rotation);
-      log.broadcast(dilation);
+      //let dilation = new Dilation(this, center, this.length() / (this.length() - distance), { exclude: [translation.object].concat(existingExclusions), preImage: this });
+      //log.broadcast(rotation);
+      //log.broadcast(dilation);
     }
   }
   ;
@@ -85,7 +85,7 @@ class LineSegment extends LinearObject {
   }
   ;
   translate(vector) {
-    log.broadcast(new Translation(this, vector, { preImage: this }));
+    //log.broadcast(new Translation(this, vector, { preImage: this }));
   }
   ;
   getX(y) {
@@ -130,7 +130,7 @@ class LineSegment extends LinearObject {
     }
   }
   ;
-  draw(offset, color, dilation, thickness) {
+  draw(ctx: CanvasRenderingContext2D, offset, color, dilation, thickness) {
     ctx.lineWidth = thickness;
     ctx.translate(.5, .5);
     offset = offset || new Vector(0, 0);

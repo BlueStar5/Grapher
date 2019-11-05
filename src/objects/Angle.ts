@@ -26,7 +26,7 @@ class Angle extends GeomObject {
   toString(): string {
     throw new Error("Method not implemented.");
   }
-  draw(offset: Vector, dilation: number, color: string, thickness: number): void {
+  draw(ctx: CanvasRenderingContext2D, offset: Vector, dilation: number, color: string, thickness: number): void {
     throw new Error("Method not implemented.");
   }
   constructor(public p1: Vector, public vertex: Vector, public p2: Vector) {

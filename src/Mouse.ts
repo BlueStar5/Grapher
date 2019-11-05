@@ -22,7 +22,7 @@ function Mouse() {
     this.mouse.x = newX;
     this.mouse.y = newY;
     this.moveFunctions.forEach(priority => {
-      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
+      priority.forEach(funcData => funcData.f(...funcData.args));
     });
     //cam.update(this.mouse);
   });
@@ -33,7 +33,7 @@ function Mouse() {
     this.mouse.deltaX = 0;
     this.mouse.deltaY = 0;
     this.downFunctions.forEach(priority => {
-      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
+      priority.forEach(funcData => funcData.f(...funcData.args));
     });
   });
   document.addEventListener('mouseup', e => this.mouse.down = false);
@@ -42,7 +42,7 @@ function Mouse() {
     this.mouse.wheelX = e.clientX - ui.canvasOffsetX();
     this.mouse.wheelY = e.clientY;
     this.wheelFunctions.forEach(priority => {
-      priority.forEach(funcData => funcData.f(...[this.mouse].concat(funcData.args)));
+      priority.forEach(funcData => funcData.f(...funcData.args));
     });
     this.mouse.deltaWheel = 0;
   });
@@ -50,18 +50,18 @@ function Mouse() {
     if (!this.moveFunctions[priority]) {
       this.moveFunctions[priority] = [];
     }
-    this.moveFunctions[priority].push({ f: f, args: args });
+    this.moveFunctions[priority].push({ f: f, args: args || [] });
   };
   this.onDown = function (f, priority, args) {
     if (!this.downFunctions[priority]) {
       this.downFunctions[priority] = [];
     }
-    this.downFunctions[priority].push({ f: f, args: args });
+    this.downFunctions[priority].push({ f: f, args: args || [] });
   };
   this.onWheel = function (f, priority, args) {
     if (!this.wheelFunctions[priority]) {
       this.wheelFunctions[priority] = [];
     }
-    this.wheelFunctions[priority].push({ f: f, args: args });
+    this.wheelFunctions[priority].push({ f: f, args: args || [] });
   };
 }

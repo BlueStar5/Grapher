@@ -24,7 +24,7 @@ class Line extends LinearObject {
   receive() {
   }
   translate(vector) {
-    log.broadcast(new Translation(this, vector, { preImage: this }));
+    //log.broadcast(new Translation(this, vector, { preImage: this }));
   }
   translated(vector) {
     return new Line(this.p1.translated(vector), this.p2.translated(vector));
@@ -67,7 +67,7 @@ class Line extends LinearObject {
     return this.getLineIntersection(this.perpThrough(vector));
     // return this.getIntersection(this.perpThrough(vector)).point();
   }
-  draw(offset, color, dilation, thickness) {
+  draw(ctx: CanvasRenderingContext2D, offset, color, dilation, thickness) {
     ctx.lineWidth = thickness;
     ctx.translate(.5, .5);
     offset = offset || new Vector(0, 0);

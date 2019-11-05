@@ -90,7 +90,7 @@ class Arc extends DimensionalObject {
         }
     }
     translate(vector) {
-        log.broadcast(new Translation(this, vector, { preImage: this }));
+        //log.broadcast(new Translation(this, vector, { preImage: this }));
     }
     dilated(center, factor) {
         return new Arc(this.angle.dilated(center, factor));
@@ -104,13 +104,13 @@ class Arc extends DimensionalObject {
         if (fixedTo.includes(transformation.object)) {
             if (transformation.object == this.center) {
                 let translation = transformation;
-                log.broadcast(new Translation(this, translation.vector, { preImage: this, exclude: existingExclusions.concat([translation.object]) }));
+                //log.broadcast(new Translation(this, translation.vector, { preImage: this, exclude: existingExclusions.concat([translation.object]) }));
             }
             else {
                 let dilation = transformation;
                 let prevRadius = dilation.getPreImage().distanceTo(this.center);
                 let newRadius = dilation.getImage().distanceTo(this.center);
-                log.broadcast(new Dilation(this, this.center, newRadius / prevRadius, { exclude: existingExclusions.concat([dilation.object]), preImage: this }));
+                //log.broadcast(new Dilation(this, this.center, newRadius / prevRadius, { exclude: existingExclusions.concat([dilation.object]), preImage: this }));
             }
         }
     }
@@ -175,13 +175,13 @@ class Arc extends DimensionalObject {
     }
     ;
     draw(offset, dilation, color, thickness) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = thickness;
-        // ctx.translate(.5, .5);
+        grapher.ctx.strokeStyle = color;
+        grapher.ctx.lineWidth = thickness;
+        // grapher.ctx.translate(.5, .5);
         offset = offset || new Vector(0, 0);
-        ctx.beginPath();
-        ctx.arc(utils.roundFromZero(this.center.x * dilation + offset.x), utils.roundFromZero(-this.center.y * dilation + offset.y), this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
-        ctx.stroke();
-        // ctx.translate(-.5, -.5);
+        grapher.ctx.beginPath();
+        grapher.ctx.arc(utils.roundFromZero(this.center.x * dilation + offset.x), utils.roundFromZero(-this.center.y * dilation + offset.y), this.getRadius(), 2 * Math.PI - this.angle.getStartAngle(), 2 * Math.PI - this.angle.getEndAngle(), true);
+        grapher.ctx.stroke();
+        // grapher.ctx.translate(-.5, -.5);
     }
 }

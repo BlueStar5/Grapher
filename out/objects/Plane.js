@@ -30,7 +30,7 @@ class Plane {
     }
     addVector(vector) {
         if (vector.id === undefined) {
-            vector.setId(plane.numObjects());
+            vector.setId(this.numObjects());
             this.vectors.push(vector);
         }
     }
@@ -50,11 +50,11 @@ class Plane {
         return this.arcs.filter(a => a.id === id)[0] || null;
     }
     addLine(line) {
-        line.setId(plane.numObjects());
+        line.setId(grapher.plane.numObjects());
         this.lines.push(line);
     }
     addArc(arc) {
-        arc.setId(plane.numObjects());
+        arc.setId(grapher.plane.numObjects());
         this.arcs.push(arc);
     }
 }

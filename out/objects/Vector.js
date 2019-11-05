@@ -16,7 +16,7 @@ class Vector extends GeomObject {
         return this.endpointOf.includes(line);
     }
     ;
-    draw(offset, color, dilation, radius) {
+    draw(ctx, offset, color, dilation, radius) {
         offset = offset || new Vector(0, 0);
         ctx.fillStyle = color;
         ctx.beginPath();
@@ -79,10 +79,10 @@ class Vector extends GeomObject {
             if (translation.args && translation.args.exclude) {
                 exclude = exclude.concat(translation.args.exclude);
             }
-            log.broadcast(new Translation(this, displacement, { exclude: exclude }));
+            //log.broadcast(new Translation(this, displacement, { exclude: exclude }));
         }
         else {
-            log.broadcast(new Translation(this, displacement));
+            //log.broadcast(new Translation(this, displacement));
         }
     }
     dilate(center, factor, dilation) {
@@ -92,10 +92,10 @@ class Vector extends GeomObject {
             if (dilation.args && dilation.args.exclude) {
                 exclude = exclude.concat(dilation.args.exclude);
             }
-            log.broadcast(new Dilation(this, center, factor, { exclude: exclude }));
+            //log.broadcast(new Dilation(this, center, factor, { exclude: exclude }));
         }
         else {
-            log.broadcast(new Dilation(this, center, factor));
+            //log.broadcast(new Dilation(this, center, factor));
         }
     }
     dilated(center, factor) {
@@ -135,7 +135,7 @@ class Vector extends GeomObject {
     }
     update() {
         if (selections.isSelected(this)) {
-            ui.updateVectorProps(this);
+            //ui.updateVectorProps(this);
         }
         ui.addObject("Line Segment ", this);
     }
@@ -167,10 +167,10 @@ class Vector extends GeomObject {
             if (rotation.args && rotation.args.exclude) {
                 exclude = exclude.concat(rotation.args.exclude);
             }
-            log.broadcast(new Rotation(this, center, radians, { exclude: exclude }));
+            //log.broadcast(new Rotation(this, center, radians, { exclude: exclude }));
         }
         else {
-            log.broadcast(new Rotation(this, center, radians));
+            //log.broadcast(new Rotation(this, center, radians));
         }
     }
     rotated(center, radians) {

@@ -9,7 +9,7 @@ class Camera {
         this.perPixel = 100;
         this.gridGap = 50;
     }
-    drawLines(lines, gridColors) {
+    drawLines(ctx, lines, gridColors) {
         let color = settings.lineColor;
         let offset = this.min.negative();
         // set the boundaries of the grid
@@ -64,7 +64,7 @@ class Camera {
                     thickness = settings.selectedThickness;
                 }
                 // draw the LineSegment of the line that's in the grid
-                new LineSegment(points[0], points[1]).draw(offset, color, 100 / this.perPixel, thickness);
+                new LineSegment(points[0], points[1]).draw(ctx, offset, color, 100 / this.perPixel, thickness);
                 // if grid line
                 if (gridColors) {
                     let dPlaces = settings.displayPlaces;
@@ -132,29 +132,29 @@ class Camera {
         this.max = this.max.add(translation);
     }
     ;
-    update() {
+    update(ctx) {
         this.plane.grid.update(this.gridGap, this.perPixel, this.min.x, -this.max.y, this.max.x, -this.min.y);
         ctx.fillStyle = settings.gridBackground;
         ctx.fillRect(0, 0, this.max.subtract(this.min).x, this.max.subtract(this.min).y);
         this.drawArcs(this.plane.arcs);
-        this.drawLines(this.plane.grid.lines, settings.gridLineColors);
-        this.drawLines(this.plane.lines);
-        this.drawVectors(this.plane.getVectors());
+        this.drawLines(ctx, this.plane.grid.lines, settings.gridLineColors);
+        this.drawLines(ctx, this.plane.lines);
+        this.drawVectors(ctx, this.plane.getVectors());
     }
     ;
-    drawVectors(vectors) {
+    drawVectors(ctx, vectors) {
         vectors.forEach(v => {
-            this.drawVector(v);
+            this.drawVector(ctx, v);
         });
     }
     ;
-    drawVector(v) {
+    drawVector(ctx, v) {
         if (v.x >= this.plane.grid.minX && v.x <= this.plane.grid.maxX && v.y >= this.plane.grid.minY && v.y <= this.plane.grid.maxY) {
             let radius = settings.pointRadius;
             if (selections.isSelected(v)) {
                 radius = settings.selectedRadius;
             }
-            v.draw(this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
+            v.draw(ctx, this.min.negative(), settings.vectorColor, 100 / this.perPixel, radius);
         }
     }
     ;

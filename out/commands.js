@@ -1,6 +1,6 @@
 let commands = {
-    getVectorFromMouse: function (mouse) {
-        let vector = utils.canvasToGrid(new Vector(mouse.downX, mouse.downY));
+    getVectorFromMouse: function (mouse, cam) {
+        let vector = utils.canvasToGrid(cam, new Vector(mouse.downX, mouse.downY));
         if (settings.selecting && selections.getSelected().length) {
             let lastSelected = selections.lastSelected();
             if (lastSelected &&
@@ -13,7 +13,7 @@ let commands = {
                         lastSelected.constructor.name === Line.name ||
                         lastSelected.constructor.name === Arc.name) {
                         vector = lastSelected.pointClosestTo(vector);
-                        let existingVector = plane.getVectors().filter(v => v.equals(vector))[0];
+                        let existingVector = grapher.plane.getVectors().filter(v => v.equals(vector))[0];
                         if (existingVector) {
                             vector = existingVector;
                         }
@@ -29,13 +29,13 @@ let commands = {
     },
     pan: function (mouse) {
         if (mouse.down && settings.mode === 'pan') {
-            cam.translate(new Vector(-mouse.deltaX, -mouse.deltaY));
+            grapher.cam.translate(new Vector(-mouse.deltaX, -mouse.deltaY));
         }
     },
-    segment: function (mouse, keys) {
+    segment: function (mouse, keys, cam) {
         if (settings.mode === 'segment') {
-            let vector = commands.getVectorFromMouse(mouse);
-            plane.addTempVector(vector);
+            let vector = commands.getVectorFromMouse(mouse, cam);
+            grapher.plane.addTempVector(vector);
             let command = log.getLastCommand();
             if (!command || command.constructor.name !== SegmentCreation.name || command.finished) {
                 command = new SegmentCreation();
@@ -58,10 +58,10 @@ let commands = {
             }
         }
     },
-    line: function (mouse, keys) {
+    line: function (mouse, keys, cam) {
         if (settings.mode === 'line') {
-            let vector = commands.getVectorFromMouse(mouse);
-            plane.addTempVector(vector);
+            let vector = commands.getVectorFromMouse(mouse, cam);
+            grapher.plane.addTempVector(vector);
             let command = log.getLastCommand();
             if (!command || command.constructor.name !== LineCreation.name || command.finished) {
                 command = new LineCreation();
@@ -84,28 +84,28 @@ let commands = {
             }
         }
     },
-    select: function (mouse, keys) {
+    select: function (mouse, keys, cam) {
         if (settings.selecting) {
             if (!keys.shift) {
                 selections.clearSelection();
             }
             ui.clearProps();
             // get canvas pos of mouse click
-            let pos = utils.canvasToGrid(new Vector(mouse.downX, mouse.downY));
+            let pos = utils.canvasToGrid(cam, new Vector(mouse.downX, mouse.downY));
             // get vector within required radius of the mouse click
-            let vector = plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
+            let vector = grapher.plane.vectors.filter(v => pos.subtract(v).magnitude() <= settings.selectRadius)[0];
             if (vector) {
                 selections.addToGroup(vector);
-                ui.updateVectorProps(vector);
+                //ui.updateVectorProps(vector);
             }
             else {
-                let line = plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
+                let line = grapher.plane.lines.filter(l => l.distanceTo(pos) <= settings.selectRadius)[0];
                 if (line) {
                     selections.addToGroup(line);
                     ui.updateLineProps(line);
                 }
                 else {
-                    let arc = plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
+                    let arc = grapher.plane.arcs.filter(a => a.distanceTo(pos) <= settings.selectRadius)[0];
                     if (arc) {
                         selections.addToGroup(arc);
                     }
@@ -113,10 +113,10 @@ let commands = {
             }
         }
     },
-    vector: function (mouse) {
+    vector: function (mouse, cam) {
         if (settings.mode === 'vector') {
-            let vector = commands.getVectorFromMouse(mouse);
-            plane.addVector(vector);
+            let vector = commands.getVectorFromMouse(mouse, cam);
+            grapher.plane.addVector(vector);
             ui.addObject("Vector ", vector);
         }
     },
@@ -130,7 +130,7 @@ let commands = {
                 obj.translate(translation);
                 log.objectCommands++;
             });
-            /*let v = plane.getVector(settings.selected[0]);
+            /*let v = grapher.plane.getVector(settings.selected[0]);
             if (v) {
               if (settings.logToConsole) {
                 console.log("|\n|---Vector " + v.id + " being translated---\n|");
@@ -139,7 +139,7 @@ let commands = {
               log.objectCommands++; // TODO
             }
             else {
-              let l = plane.getLine(settings.selected[0]);
+              let l = grapher.plane.getLine(settings.selected[0]);
               if (l) {
                 if (settings.logToConsole) {
                   console.log("|\n|---Line " + l.id + " being translated---\n|");
@@ -149,11 +149,11 @@ let commands = {
             }*/
         }
     },
-    arc: function (mouse, keys) {
+    arc: function (mouse, keys, cam) {
         if (settings.mode === 'arc') {
             //
-            let vector = commands.getVectorFromMouse(mouse);
-            plane.addTempVector(vector);
+            let vector = commands.getVectorFromMouse(mouse, cam);
+            grapher.plane.addTempVector(vector);
             let command = log.getLastCommand();
             if (!command || command.constructor.name !== ArcCreation.name || command.finished) {
                 command = new ArcCreation();
@@ -180,7 +180,7 @@ let commands = {
     fix: function (mouse) {
         console.log("HOYA");
         if (settings.mode === 'fix') {
-            let v = plane.getVector(settings.selected[0]);
+            let v = grapher.plane.getVector(settings.selected[0]);
             if (v) {
                 v.constraints.fixed = !v.constraints.fixed;
             }

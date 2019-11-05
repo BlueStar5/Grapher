@@ -21,7 +21,7 @@ let utils = (function() {
         sqr(x) {
           return x * x;
         },
-        canvasToGrid(vector) {
+        canvasToGrid(cam, vector) {
           let v = vector.add(cam.min).multiply(cam.perPixel / 100);
           v.y *= -1;
           return v;

@@ -27,7 +27,7 @@ abstract class GeomObject {
   abstract nameString(): string;
   abstract detailsString(): string;
   abstract toString(): string;
-  abstract draw(offset: Vector, dilation: number, color: string,
+  abstract draw(ctx: CanvasRenderingContext2D, offset: Vector, dilation: number, color: string,
     thickness: number): void;
   abstract equals(object: GeomObject): boolean;
 }

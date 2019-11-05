@@ -32,7 +32,7 @@ class Locus extends GeomObject {
     toString() {
         throw new Error("Method not implemented.");
     }
-    draw(offset, dilation, color, thickness) {
+    draw(ctx, offset, dilation, color, thickness) {
         throw new Error("Method not implemented.");
     }
     constructor(set) {

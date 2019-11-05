@@ -18,14 +18,14 @@ let ui = {
             this.objectChildren.removeChild(this.objectChildren.firstChild);
         }
     },
-    updateVectorProps: function (vector) {
+    updateVectorProps: function (vector, ctx) {
         let vectorProps = document.getElementsByClassName(vector.id)[0] || document.getElementsByName('vector')[0];
         vectorProps.classList.remove('no-display');
         let inputX = vectorProps.children.namedItem('vector-x').children[0];
         let inputY = vectorProps.children.namedItem('vector-y').children[0];
         [inputX, inputY].forEach(i => i.addEventListener('input', e => {
             vector.setPosition(new Vector(parseFloat(inputX.value), parseFloat(inputY.value)));
-            cam.update();
+            grapher.cam.update(ctx);
         }));
         inputX.value = vector.x;
         inputY.value = vector.y;
@@ -42,7 +42,7 @@ let ui = {
           this.updateVectorProps(c);
         });*/
     },
-    getVectorTemplate: function (vector) {
+    getVectorTemplate: function (vector, ctx) {
         let textH2 = document.createTextNode('Vector');
         let h2 = document.createElement('h2');
         h2.classList.add('side-heading');
@@ -58,7 +58,7 @@ let ui = {
         inputY.value = vector.y;
         [inputX, inputY].forEach(e => addEventListener('input', function (e) {
             vector.setPosition(new Vector(parseFloat(inputX.value), parseFloat(inputY.value)));
-            cam.update();
+            grapher.cam.update(ctx);
         }));
         let labelX = document.createElement('label');
         labelX.setAttribute('name', 'vector-x');

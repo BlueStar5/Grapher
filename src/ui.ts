@@ -18,7 +18,7 @@ let ui = {
       this.objectChildren.removeChild(this.objectChildren.firstChild);
     }
   },
-  updateVectorProps: function(vector) {
+  updateVectorProps: function(vector, ctx) {
     let vectorProps : HTMLDivElement = <HTMLDivElement> document.getElementsByClassName(vector.id)[0] || <HTMLDivElement> document.getElementsByName('vector')[0];
 
     vectorProps.classList.remove('no-display');
@@ -28,7 +28,7 @@ let ui = {
 
     [inputX, inputY].forEach(i => i.addEventListener('input', e => {
       vector.setPosition(new Vector(parseFloat(inputX.value), parseFloat(inputY.value)));
-      cam.update();
+      grapher.cam.update(ctx);
     }));
 
     inputX.value = vector.x;
@@ -48,7 +48,7 @@ let ui = {
       this.updateVectorProps(c);
     });*/
   },
-  getVectorTemplate: function(vector) {
+  getVectorTemplate: function(vector, ctx) {
     let textH2 = document.createTextNode('Vector');
 
     let h2 = document.createElement('h2');
@@ -70,7 +70,7 @@ let ui = {
 
     [inputX, inputY].forEach(e => addEventListener('input', function(e) {
       vector.setPosition(new Vector(parseFloat(inputX.value), parseFloat(inputY.value)));
-      cam.update();
+      grapher.cam.update(ctx);
     }));
 
     let labelX = document.createElement('label');
