@@ -53,37 +53,38 @@ class Vector extends GeomObject {
     }
     ;
     translate(vector, translation) {
-        let image = this.add(vector);
+        this.setPosition(this.add(vector));
+        /*let image = this.add(vector);
         let fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
         // if a parent is trying to translate, let this act as if fixed to its image
         // instead to prevent a conflict
         if (translation) {
-            fixedTo = fixedTo.filter(obj => obj !== translation.object);
-            if (!translation.object.fixedTo(this)) {
-                fixedTo.push(translation.getImage());
-            }
+          fixedTo = fixedTo.filter(obj => obj !== translation.object);
+          if (!translation.object.fixedTo(this)) {
+            fixedTo.push(translation.getImage());
+          }
         }
         if (fixedTo.length) {
-            // try to translate to the closest intersection of all parents
-            // if there is no intersection, then this point can't move anywhere
-            let intersection = new Locus(fixedTo).getSelfIntersection(); //fixedTo[0].getIntersection(fixedTo.slice(1));
-            if (intersection) {
-                image = intersection.pointClosestTo(image);
-            }
-            //image = intersection ? image.getClosest(intersection) : this;
+          // try to translate to the closest intersection of all parents
+          // if there is no intersection, then this point can't move anywhere
+          let intersection = new Locus(fixedTo).getSelfIntersection(); //fixedTo[0].getIntersection(fixedTo.slice(1));
+          if (intersection) {
+            image = intersection.pointClosestTo(image);
+          }
+          //image = intersection ? image.getClosest(intersection) : this;
         }
         let displacement = image.subtract(this);
         this.setPosition(image);
         if (translation) {
-            let exclude = [translation.object];
-            if (translation.args && translation.args.exclude) {
-                exclude = exclude.concat(translation.args.exclude);
-            }
-            //log.broadcast(new Translation(this, displacement, { exclude: exclude }));
+          let exclude = [translation.object];
+          if (translation.args && translation.args.exclude) {
+            exclude = exclude.concat(translation.args.exclude);
+          }
+          //log.broadcast(new Translation(this, displacement, { exclude: exclude }));
         }
         else {
-            //log.broadcast(new Translation(this, displacement));
-        }
+          //log.broadcast(new Translation(this, displacement));
+        }*/
     }
     dilate(center, factor, dilation) {
         this.setPosition(this.dilated(center, factor));
@@ -180,6 +181,10 @@ class Vector extends GeomObject {
             return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
         }
         return this;
+    }
+    set(vector) {
+        this.x = vector.x;
+        this.y = vector.y;
     }
     translated(vector) {
         return this.add(vector);

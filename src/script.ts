@@ -1,8 +1,34 @@
 declare let ResizeSensor;
 let grapher = (function() {
-
-  function translate(obj, vector) {
-    
+  let transformationHist = [];
+  let transformations = {};
+  let constraints = {};
+  function translate(obj: GeomObject, vector) {
+    transformations[obj.id] = new Translation(vector);
+  }
+  function constrain(obj: GeomObject, constraint: Constraint) {
+    constraints[obj.id] = constraint;
+  }
+  function applyTransformations() {
+    plane.getObjects().forEach(obj => {
+      let transformation: Transformation = transformations[obj.id];
+      if (transformation) {
+        obj.set(transformation.apply(obj));
+      }
+      transformations[obj.id] = undefined;
+    });
+  }
+  function applyConstraints() {
+    plane.getObjects().forEach(obj => {
+      let constraint: Constraint = constraints[obj.id];
+      if (constraint) {
+        constraint.apply(obj, transformations);
+      }
+    })
+  }
+  function update() {
+    applyConstraints();
+    applyTransformations();
   }
   ui.init();
 
@@ -60,9 +86,25 @@ let grapher = (function() {
     selections.groupNum++;
   });
 
-  plane.addVector(new Vector(50, 0));
-  plane.addVector(new Vector(0, 0));
-  plane.addVector(new Vector(0, 50));
+  let v0 = new Vector(175, 25);
+  let v1 = new Vector(100, 50);
+  let v2 = new Vector(200, 100);
+  let l = new LineSegment(v1.clone(), v2.clone());
+
+  plane.addVector(v0);
+  plane.addVector(v1);
+  plane.addVector(v2);
+  plane.addLine(l)
+  //constrain(v1, new OnConstraint(l));
+  constrain(v2, new OnConstraint(l));
+  constrain(l, new BoundedByConstraint(v1));
+  
+  //constrain(v0, new OnConstraint(l));
+
+  setInterval(function() {
+    translate(v1, new Vector(2, 1));
+    update();
+  }, 100);
   return {
     ctx: ctx,
     cam: cam,

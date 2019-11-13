@@ -7,11 +7,13 @@ class LineSegment extends LinearObject {
   yInt() {
     return this.extended().getY(0);
   }
-  ;
   midpoint() {
     return this.p1.add(this.p2).divide(2);
   }
-  ;
+  set(line: LineSegment) {
+    this.p1.set(line.p1);
+    this.p2.set(line.p2);
+  }
   receive(transformation) {
     let fixedTo = this.constraints.fixedTo;
     if (fixedTo.includes(transformation.object)) {
@@ -38,11 +40,9 @@ class LineSegment extends LinearObject {
       //log.broadcast(dilation);
     }
   }
-  ;
   translated(vector: Vector) {
     return new LineSegment(this.p1.translated(vector), this.p2.translated(vector));
   }
-  ;
   extended(endpoint?, distance?) {
     if (arguments.length === 0) {
       return new Line(this.p1.clone(), this.p2.clone());
@@ -61,20 +61,16 @@ class LineSegment extends LinearObject {
     }
     return new LineSegment(p1, p2);
   }
-  ;
   rotated(center, radians) {
     let endpoints = [this.p1, this.p2].map(p => p.rotated(center, radians));
     return new LineSegment(endpoints[0], endpoints[1]);
   }
-  ;
   dilated(center: Vector, factor: number) {
     return new LineSegment(this.p1.dilated(center, factor), this.p2.dilated(center, factor));
   }
-  ;
   onLine(vector) {
     return utils.equal(this.getX(vector.y), vector.x) || utils.equal(this.getY(vector.x), vector.y);
   }
-  ;
   update() {
     /*this.children.forEach(c => {
       c.update();
@@ -83,25 +79,21 @@ class LineSegment extends LinearObject {
       ui.updateLineProps(this);
     }*/
   }
-  ;
   translate(vector) {
     //log.broadcast(new Translation(this, vector, { preImage: this }));
   }
-  ;
   getX(y) {
     if (y >= this.p1.y && y <= this.p2.y || y <= this.p1.y && y >= this.p2.y) {
       return (y - this.p1.y) / this.getSlope() + this.p1.x;
     }
     return undefined;
   }
-  ;
   getY(x) {
     if (x >= this.p1.x && x <= this.p2.x || x <= this.p1.x && x >= this.p2.x) {
       return this.getSlope() * (x - this.p1.x) + this.p1.y;
     }
     return undefined;
   }
-  ;
   perpThrough(vector: Vector): Line {
     let perp = new Line({ slope: -1 / this.getSlope(), p: vector.clone() });
     if (this.getLineIntersection(perp)) {
@@ -109,7 +101,6 @@ class LineSegment extends LinearObject {
     }
     return undefined;
   }
-  ;
   distanceTo(vector) {
     let perp = this.perpThrough(vector);
     if (perp) {
@@ -119,7 +110,6 @@ class LineSegment extends LinearObject {
       return Math.min(vector.subtract(this.p1).magnitude(), vector.subtract(this.p2).magnitude());
     }
   }
-  ;
   pointClosestTo(vector: Vector): Vector {
     let perp = this.perpThrough(vector);
     if (perp) {
@@ -129,7 +119,6 @@ class LineSegment extends LinearObject {
       return vector.subtract(this.p2).magnitude() < vector.subtract(this.p1).magnitude() ? this.p2 : this.p1;
     }
   }
-  ;
   draw(ctx: CanvasRenderingContext2D, offset, color, dilation, thickness) {
     ctx.lineWidth = thickness;
     ctx.translate(.5, .5);
@@ -141,11 +130,9 @@ class LineSegment extends LinearObject {
     ctx.stroke();
     ctx.translate(-.5, -.5);
   }
-  ;
   getSlope() {
     return (this.p2.y - this.p1.y) / (this.p2.x - this.p1.x);
   }
-  ;
   containsPoint(vector) {
     return this.onLine(vector);
   }
@@ -195,7 +182,6 @@ class LineSegment extends LinearObject {
       return this.getLocusIntersection(obj);
     }
   }
-  ;
   getArcIntersection(arc) {
     return arc.getLineIntersection(this);
   }
@@ -205,15 +191,12 @@ class LineSegment extends LinearObject {
   equals(line) {
     return this.p1.equals(line.p1) && this.p2.equals(line.p2);
   }
-  ;
   clone() {
     return new LineSegment(this.p1.clone(), this.p2.clone());
   }
-  ;
   length() {
     return this.p2.subtract(this.p1).magnitude();
   }
-  ;
   nameString() {
     if (this.id !== undefined) {
       return 'Line Segment ' + this.id;
@@ -222,13 +205,10 @@ class LineSegment extends LinearObject {
       return 'Line Segment';
     }
   }
-  ;
   detailsString() {
     return `\(\(${utils.roundFromZero(this.p1.x, 2)}, ${utils.roundFromZero(this.p1.y, 2)}\), \(${utils.roundFromZero(this.p2.x, 2)}, ${utils.roundFromZero(this.p2.y, 2)}\)\)`;
   }
-  ;
   toString() {
     return `${this.nameString()} ${this.detailsString()}`;
   }
-  ;
 }

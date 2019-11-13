@@ -55,7 +55,8 @@ class Vector extends GeomObject {
   }
   ;
   translate(vector, translation?) {
-    let image = this.add(vector);
+    this.setPosition(this.add(vector));
+    /*let image = this.add(vector);
     let fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
     // if a parent is trying to translate, let this act as if fixed to its image
     // instead to prevent a conflict
@@ -85,7 +86,7 @@ class Vector extends GeomObject {
     }
     else {
       //log.broadcast(new Translation(this, displacement));
-    }
+    }*/
   }
   dilate(center, factor, dilation) {
     this.setPosition(this.dilated(center, factor));
@@ -182,6 +183,10 @@ class Vector extends GeomObject {
       return new Vector(Math.cos(angleSum), Math.sin(angleSum)).multiply(relativeVector.magnitude()).add(center);
     }
     return this;
+  }
+  set(vector: Vector) {
+    this.x = vector.x;
+    this.y = vector.y;
   }
   translated(vector) {
     return this.add(vector);

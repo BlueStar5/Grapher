@@ -51,11 +51,11 @@ class Plane {
     return this.arcs.filter(a => a.id === id)[0] || null;
   }
   addLine(line) {
-    line.setId(grapher.plane.numObjects());
+    line.setId(this.numObjects());
     this.lines.push(line);
   }
   addArc(arc) {
-    arc.setId(grapher.plane.numObjects());
+    arc.setId(this.numObjects());
     this.arcs.push(arc);
   }
 }
