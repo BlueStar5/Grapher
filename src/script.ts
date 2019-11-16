@@ -3,8 +3,11 @@ let grapher = (function() {
   let transformationHist = [];
   let transformations = {};
   let constraints = {};
-  function translate(obj: GeomObject, vector) {
+  function translate(obj: GeomObject, vector: Vector) {
     transformations[obj.id] = new Translation(vector);
+  }
+  function dilate(obj: GeomObject, center: Vector, factor: number) {
+    transformations[obj.id] = new Dilation(center, factor);
   }
   function constrain(obj: GeomObject, constraint: Constraint) {
     constraints[obj.id] = constraint;
@@ -29,6 +32,7 @@ let grapher = (function() {
   function update() {
     applyConstraints();
     applyTransformations();
+    cam.update(ctx);
   }
   ui.init();
 
@@ -86,7 +90,7 @@ let grapher = (function() {
     selections.groupNum++;
   });
 
-  let v0 = new Vector(175, 25);
+  let v0 = new Vector(30, 30);
   let v1 = new Vector(100, 50);
   let v2 = new Vector(200, 100);
   let l = new LineSegment(v1.clone(), v2.clone());
@@ -102,7 +106,8 @@ let grapher = (function() {
   //constrain(v0, new OnConstraint(l));
 
   setInterval(function() {
-    translate(v1, new Vector(2, 1));
+    translate(v1, new Vector(8, 4));
+    dilate(v0, new Vector(0, 0), 1.02);
     update();
   }, 100);
   return {
