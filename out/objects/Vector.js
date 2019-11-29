@@ -37,7 +37,7 @@ class Vector extends GeomObject {
         let refAngle = Math.abs(Math.atan(y / x));
         let angle = refAngle;
         if (x > 0) {
-            if (y > 0) {
+            if (y < 0) {
                 angle = Math.PI * 2 - refAngle;
             }
         }
