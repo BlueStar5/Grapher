@@ -161,7 +161,7 @@ class Vector extends GeomObject {
         }
         return this;
     }
-    set(vector) {
+    copy(vector) {
         this.x = vector.x;
         this.y = vector.y;
     }

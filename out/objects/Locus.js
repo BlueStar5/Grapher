@@ -32,12 +32,12 @@ class Locus extends GeomObject {
     toString() {
         throw new Error("Method not implemented.");
     }
-    draw(ctx, offset, dilation, color, thickness) {
+    draw(ctx, offsett, dilation, color, thickness) {
         throw new Error("Method not implemented.");
     }
-    constructor(set) {
+    constructor(sett) {
         super();
-        this.set = set || [];
+        this.set = sett || [];
         this.removeDupes();
     }
     removeDupes() {
@@ -65,22 +65,22 @@ class Locus extends GeomObject {
     }
     getSingleObjIntersection(obj) {
         let ints = [];
-        this.set.forEach(setObj => {
+        this.set.forEach(settObj => {
             let intersection;
-            if (setObj.constructor.name === Vector.name) {
-                if (obj.containsPoint(setObj)) {
-                    intersection = setObj.clone();
+            if (settObj.constructor.name === Vector.name) {
+                if (obj.containsPoint(settObj)) {
+                    intersection = settObj.clone();
                 }
             }
-            if (setObj.constructor.name === LineSegment.name ||
-                setObj.constructor.name === Line.name) {
-                intersection = obj.getLineIntersection(setObj);
+            if (settObj.constructor.name === LineSegment.name ||
+                settObj.constructor.name === Line.name) {
+                intersection = obj.getLineIntersection(settObj);
             }
-            if (setObj.constructor.name === Arc.name) {
-                intersection = obj.getArcIntersection(setObj);
+            if (settObj.constructor.name === Arc.name) {
+                intersection = obj.getArcIntersection(settObj);
             }
-            if (setObj.constructor.name === Locus.name) {
-                intersection = setObj.getSingleObjIntersection(obj);
+            if (settObj.constructor.name === Locus.name) {
+                intersection = settObj.getSingleObjIntersection(obj);
             }
             if (intersection) {
                 ints.push(intersection);
@@ -92,11 +92,11 @@ class Locus extends GeomObject {
         return this.set.map(obj => obj.pointClosestTo(vector)).reduce((cur, closest) => cur.distanceTo(vector) < closest.distanceTo(vector) ? cur : closest);
     }
     getLocusIntersection(locus) {
-        let intSet = [];
+        let intsett = [];
         this.set.forEach(obj => {
-            intSet.push(locus.getIntersection(obj));
+            intsett.push(locus.getIntersection(obj));
         });
-        return new Locus(intSet).flatten();
+        return new Locus(intsett).flatten();
     }
     getSelfIntersection() {
         if (this.set.length === 1) {

@@ -10,7 +10,7 @@ let transformationManager = (function() {
         objects.forEach(obj => {
             let transformationList = transformations[obj.id];
             if (transformationList) {
-                transformationList.forEach(transformation => obj.set(transformation.apply(obj)));
+                transformationList.forEach(transformation => obj.copy(transformation.apply(obj)));
             }
         });
         transformations = {};

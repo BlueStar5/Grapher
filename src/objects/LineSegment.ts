@@ -10,9 +10,9 @@ class LineSegment extends LinearObject {
   midpoint() {
     return this.p1.add(this.p2).divide(2);
   }
-  set(line: LineSegment) {
-    this.p1.set(line.p1);
-    this.p2.set(line.p2);
+  copy(line: LineSegment) {
+    this.p1.copy(line.p1);
+    this.p2.copy(line.p2);
   }
   receive(transformation) {
     let fixedTo = this.constraints.fixedTo;
