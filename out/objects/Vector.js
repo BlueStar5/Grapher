@@ -24,8 +24,7 @@ class Vector extends GeomObject {
             14, 20);
     }
     angle(center) {
-        let x;
-        let y;
+        let x, y;
         if (center) {
             let relativeVector = this.subtract(center);
             x = relativeVector.x;
@@ -37,50 +36,34 @@ class Vector extends GeomObject {
         }
         let refAngle = Math.abs(Math.atan(y / x));
         let angle = refAngle;
-        if (x < 0 && y > 0) {
-            angle = Math.PI - refAngle;
+        if (x > 0) {
+            if (y > 0) {
+                angle = Math.PI * 2 - refAngle;
+            }
         }
-        if (y < 0 && x > 0) {
-            angle = Math.PI * 2 - refAngle;
+        else if (x == 0) {
+            if (y == 0) {
+                angle = 0;
+            }
+            else if (y < 0) {
+                angle = Math.PI * 3 / 2;
+            }
         }
-        if (x < 0 && y < 0) {
-            angle = Math.PI + refAngle;
+        else if (x < 0) {
+            if (y == 0) {
+                angle = Math.PI;
+            }
+            else if (y > 0) {
+                angle = Math.PI - refAngle;
+            }
+            else if (y < 0) {
+                angle = Math.PI + refAngle;
+            }
         }
         return angle;
     }
     translate(vector, translation) {
         this.setPosition(this.add(vector));
-        /*let image = this.add(vector);
-        let fixedTo = this.constraints.fixedTo.filter(obj => !obj.fixedTo(this));
-        // if a parent is trying to translate, let this act as if fixed to its image
-        // instead to prevent a conflict
-        if (translation) {
-          fixedTo = fixedTo.filter(obj => obj !== translation.object);
-          if (!translation.object.fixedTo(this)) {
-            fixedTo.push(translation.getImage());
-          }
-        }
-        if (fixedTo.length) {
-          // try to translate to the closest intersection of all parents
-          // if there is no intersection, then this point can't move anywhere
-          let intersection = new Locus(fixedTo).getSelfIntersection(); //fixedTo[0].getIntersection(fixedTo.slice(1));
-          if (intersection) {
-            image = intersection.pointClosestTo(image);
-          }
-          //image = intersection ? image.getClosest(intersection) : this;
-        }
-        let displacement = image.subtract(this);
-        this.setPosition(image);
-        if (translation) {
-          let exclude = [translation.object];
-          if (translation.args && translation.args.exclude) {
-            exclude = exclude.concat(translation.args.exclude);
-          }
-          //log.broadcast(new Translation(this, displacement, { exclude: exclude }));
-        }
-        else {
-          //log.broadcast(new Translation(this, displacement));
-        }*/
     }
     dilate(center, factor, dilation) {
         this.setPosition(this.dilated(center, factor));

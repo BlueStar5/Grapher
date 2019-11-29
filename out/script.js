@@ -10,19 +10,24 @@ let grapher = (function () {
         //transformations[obj.id] = new Dilation(center, factor);
         transformationManager.transform(obj.id, new Dilation(center, factor));
     }
+    function rotate(obj, center, radians) {
+        transformationManager.transform(obj.id, new Rotation(center, radians));
+    }
     function constrain(obj, constraint) {
-        constraints[obj.id] = constraint;
+        //constraints[obj.id] = constraint;
+        constraintManager.constrain(obj.id, constraint);
     }
     function applyTransformations() {
         transformationManager.applyTransformations(plane.getObjects());
     }
     function applyConstraints() {
-        plane.getObjects().forEach(obj => {
-            let constraint = constraints[obj.id];
-            if (constraint) {
-                constraint.apply(obj, transformationManager);
-            }
-        });
+        /*plane.getObjects().forEach(obj => {
+          let constraint: Constraint = constraints[obj.id];
+          if (constraint) {
+            constraint.apply(obj, transformationManager);
+          }
+        });*/
+        constraintManager.applyConstraints(plane.getObjects());
     }
     function update() {
         applyConstraints();
@@ -78,22 +83,28 @@ let grapher = (function () {
     let v1 = new Vector(100, 50);
     let v2 = new Vector(200, 100);
     let l = new LineSegment(v1.clone(), v2.clone());
-    plane.addVector(v0);
-    plane.addVector(v1);
-    plane.addVector(v2);
-    plane.addLine(l);
-    //constrain(v1, new OnConstraint(l));
-    constrain(v2, new OnConstraint(l));
-    constrain(l, new BoundedByConstraint(v1));
-    //constrain(v0, new OnConstraint(l));
-    setInterval(function () {
-        translate(v1, new Vector(8, 8));
+    function init() {
+        plane.addVector(v0);
+        plane.addVector(v1);
+        plane.addVector(v2);
+        plane.addLine(l);
+        //constrain(v1, new OnConstraint(l));
+        constrain(v2, new OnConstraint(l));
+        constrain(l, new BoundedByConstraint(v1));
+        //constrain(v0, new OnConstraint(l));
+    }
+    function loop(timestamp) {
+        //translate(v1, new Vector(1, 1));
         //dilate(v0, new Vector(0, 0), 1.02);
         update();
-    }, 100);
+        requestAnimationFrame(loop);
+    }
+    init();
+    requestAnimationFrame(loop);
     return {
         ctx: ctx,
         cam: cam,
-        plane: plane
+        plane: plane,
+        translate: translate
     };
 })();

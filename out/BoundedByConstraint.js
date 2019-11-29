@@ -12,6 +12,8 @@ class BoundedByConstraint extends Constraint {
                 let dilation = new Dilation(staticEndpoint, newBound.subtract(staticEndpoint).magnitude() / line.length() /* *
                 Math.cos(newBound.angle(staticEndpoint) -
                 this.bound.angle(staticEndpoint))*/);
+                console.log("new angle: " + newBound.angle(staticEndpoint));
+                console.log("old angle: " + this.bound.angle(staticEndpoint));
                 console.log("COS: " + (Math.cos(newBound.angle(staticEndpoint) - this.bound.angle(staticEndpoint))));
                 transformationManager.transform(line.id, dilation);
                 //let bound: Vector = dilation.apply(this.bound) as Vector;
