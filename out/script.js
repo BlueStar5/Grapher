@@ -3,28 +3,24 @@ let grapher = (function () {
     let transformations = {};
     let constraints = {};
     function translate(obj, vector) {
-        transformations[obj.id] = new Translation(vector);
+        //transformations[obj.id] = new Translation(vector);
+        transformationManager.transform(obj.id, new Translation(vector));
     }
     function dilate(obj, center, factor) {
-        transformations[obj.id] = new Dilation(center, factor);
+        //transformations[obj.id] = new Dilation(center, factor);
+        transformationManager.transform(obj.id, new Dilation(center, factor));
     }
     function constrain(obj, constraint) {
         constraints[obj.id] = constraint;
     }
     function applyTransformations() {
-        plane.getObjects().forEach(obj => {
-            let transformation = transformations[obj.id];
-            if (transformation) {
-                obj.set(transformation.apply(obj));
-            }
-            transformations[obj.id] = undefined;
-        });
+        transformationManager.applyTransformations(plane.getObjects());
     }
     function applyConstraints() {
         plane.getObjects().forEach(obj => {
             let constraint = constraints[obj.id];
             if (constraint) {
-                constraint.apply(obj, transformations);
+                constraint.apply(obj, transformationManager);
             }
         });
     }
@@ -91,8 +87,8 @@ let grapher = (function () {
     constrain(l, new BoundedByConstraint(v1));
     //constrain(v0, new OnConstraint(l));
     setInterval(function () {
-        translate(v1, new Vector(8, 4));
-        dilate(v0, new Vector(0, 0), 1.02);
+        translate(v1, new Vector(8, 8));
+        //dilate(v0, new Vector(0, 0), 1.02);
         update();
     }, 100);
     return {

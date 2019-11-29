@@ -5,6 +5,9 @@ class GeomObject {
         };
         this.id = undefined;
     }
+    set(arg0) {
+        throw new Error("Method not implemented.");
+    }
     fixTo(obj) {
         this.constraints.fixedTo.push(obj);
     }

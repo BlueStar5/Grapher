@@ -11,11 +11,9 @@ class Vector extends GeomObject {
     setAsEndpoint(line) {
         this.endpointOf.push(line);
     }
-    ;
     isEndpointOf(line) {
         return this.endpointOf.includes(line);
     }
-    ;
     draw(ctx, offset, color, dilation, radius) {
         offset = offset || new Vector(0, 0);
         ctx.fillStyle = color;
@@ -25,7 +23,6 @@ class Vector extends GeomObject {
         ctx.fillText(`${this.id}`, utils.roundFromZero(this.x * dilation + offset.x) - settings.pointRadius / 2, utils.roundFromZero(-this.y * dilation + offset.y) - settings.pointRadius / 2 +
             14, 20);
     }
-    ;
     angle(center) {
         let x;
         let y;
@@ -51,7 +48,6 @@ class Vector extends GeomObject {
         }
         return angle;
     }
-    ;
     translate(vector, translation) {
         this.setPosition(this.add(vector));
         /*let image = this.add(vector);

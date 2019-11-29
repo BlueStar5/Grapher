@@ -1,4 +1,7 @@
 abstract class GeomObject {
+    set(arg0: GeomObject): void {
+        throw new Error("Method not implemented.");
+    }
   abstract getIntersection(object: GeomObject): GeomObject;
   id: number;
   constructor() {

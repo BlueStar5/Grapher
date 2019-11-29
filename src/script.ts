@@ -1,33 +1,29 @@
 declare let ResizeSensor;
 let grapher = (function() {
   let transformationHist = [];
-  let transformations = {};
+  let transformations: {[id: number]: Transformation} = {};
   let constraints = {};
   function translate(obj: GeomObject, vector: Vector) {
-    transformations[obj.id] = new Translation(vector);
+    //transformations[obj.id] = new Translation(vector);
+    transformationManager.transform(obj.id, new Translation(vector));
   }
   function dilate(obj: GeomObject, center: Vector, factor: number) {
-    transformations[obj.id] = new Dilation(center, factor);
+    //transformations[obj.id] = new Dilation(center, factor);
+    transformationManager.transform(obj.id, new Dilation(center, factor));
   }
   function constrain(obj: GeomObject, constraint: Constraint) {
     constraints[obj.id] = constraint;
   }
   function applyTransformations() {
-    plane.getObjects().forEach(obj => {
-      let transformation: Transformation = transformations[obj.id];
-      if (transformation) {
-        obj.set(transformation.apply(obj));
-      }
-      transformations[obj.id] = undefined;
-    });
+    transformationManager.applyTransformations(plane.getObjects());
   }
   function applyConstraints() {
     plane.getObjects().forEach(obj => {
       let constraint: Constraint = constraints[obj.id];
       if (constraint) {
-        constraint.apply(obj, transformations);
+        constraint.apply(obj, transformationManager);
       }
-    })
+    });
   }
   function update() {
     applyConstraints();
@@ -106,10 +102,11 @@ let grapher = (function() {
   //constrain(v0, new OnConstraint(l));
 
   setInterval(function() {
-    translate(v1, new Vector(8, 4));
-    dilate(v0, new Vector(0, 0), 1.02);
+    translate(v1, new Vector(8, 8));
+    //dilate(v0, new Vector(0, 0), 1.02);
     update();
   }, 100);
+  
   return {
     ctx: ctx,
     cam: cam,

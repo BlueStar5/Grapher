@@ -3,8 +3,8 @@ class OnConstraint extends Constraint {
         super();
         this.targetObj = targetObj;
     }
-    apply(obj, transformations) {
-        let targetObjTransformation = transformations[this.targetObj.id];
+    apply(obj, transformationManager) {
+        let targetObjTransformation = transformationManager.getTransformation(this.targetObj.id);
         let target;
         let object;
         if (targetObjTransformation) {
@@ -15,6 +15,6 @@ class OnConstraint extends Constraint {
             target = this.targetObj;
             object = obj;
         }
-        transformations[obj.id] = new Translation(target.pointClosestTo(object).subtract(obj));
+        transformationManager.transform(new Translation(target.pointClosestTo(object).subtract(obj)));
     }
 }
