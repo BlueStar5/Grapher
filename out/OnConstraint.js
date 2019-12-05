@@ -1,20 +1,18 @@
 class OnConstraint extends Constraint {
-    constructor(targetObj) {
+    constructor(focus) {
         super();
-        this.targetObj = targetObj;
+        this.focus = focus;
     }
-    apply(obj, transformationManager) {
-        let targetObjTransformation = transformationManager.getTransformation(this.targetObj.id);
-        let target;
-        let object;
-        if (targetObjTransformation) {
-            target = targetObjTransformation.apply(this.targetObj);
-            object = targetObjTransformation.apply(obj);
-        }
-        else {
-            target = this.targetObj;
-            object = obj;
-        }
-        transformationManager.transform(new Translation(target.pointClosestTo(object).subtract(obj)));
+    apply(obj, transManager) {
+        console.log(obj);
+        let focusTransformation = transManager.getTransformation(this.focus.id);
+        let focus;
+        let image;
+        let imageNew;
+        focus = focusTransformation.apply(this.focus);
+        image = transManager.getImage(obj);
+        imageNew = focusTransformation.apply(image);
+        transManager.transform(obj.id, new Translation(focus
+            .pointClosestTo(imageNew).subtract(image)));
     }
 }

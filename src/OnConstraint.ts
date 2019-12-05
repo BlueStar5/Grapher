@@ -1,21 +1,19 @@
 class OnConstraint extends Constraint {
-  targetObj: GeomObject;
-  constructor(targetObj: GeomObject) {
+  focus: GeomObject;
+  constructor(focus: GeomObject) {
     super();
-    this.targetObj = targetObj;
+    this.focus = focus;
   }
-  apply(obj: Vector, transformationManager) {
-    let targetObjTransformation: Transformation = transformationManager.getTransformation(this.targetObj.id);
-    let target: GeomObject;
-    let object: Vector;
-    if (targetObjTransformation) {
-      target = targetObjTransformation.apply(this.targetObj);
-      object = targetObjTransformation.apply(obj) as Vector;
-    }
-    else {
-      target = this.targetObj;
-      object = obj;
-    }
-    transformationManager.transform(new Translation(target.pointClosestTo(object).subtract(obj)));
+  apply(obj: Vector, transManager: typeof transformationManager) {
+    console.log(obj);
+    let focusTransformation: Transformation = transManager.getTransformation(this.focus.id);
+    let focus: GeomObject;
+    let image: Vector;
+    let imageNew: Vector;
+    focus = focusTransformation.apply(this.focus);
+    image = transManager.getImage(obj) as Vector;
+    imageNew = focusTransformation.apply(image) as Vector;
+    transManager.transform(obj.id, new Translation(focus
+      .pointClosestTo(imageNew).subtract(image)));
   }
 }

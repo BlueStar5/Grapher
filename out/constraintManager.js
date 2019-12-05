@@ -1,5 +1,6 @@
 let constraintManager = (function () {
     let constraints = {};
+    let updated = [];
     function constrain(id, constraint) {
         if (!constraints[id]) {
             constraints[id] = [];
@@ -12,6 +13,7 @@ let constraintManager = (function () {
             if (constraintList) {
                 constraintList.forEach(constraint => constraint.apply(obj, transformationManager));
             }
+            updated.push(obj.id);
         });
     }
     return {

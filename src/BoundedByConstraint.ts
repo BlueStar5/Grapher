@@ -5,22 +5,19 @@ class BoundedByConstraint extends Constraint {
     this.bound = bound;
   }
 
-  apply(line: LineSegment, transformationManager) {
-    let newBound: Vector = transformationManager.getImage(this.bound);//transformations[this.bound.id].apply(this.bound);
+  apply(line: LineSegment, transManager: typeof transformationManager) {
+    console.log(line);
+    let newBound: Vector = transManager.getImage(this.bound) as Vector;
     [line.p1, line.p2].forEach((endpoint, i, arr) => {
       if (this.bound.equals(endpoint)) {
-        let staticEndpoint = arr[1 - i];
-        //console.log(newBound.distanceTo(staticEndpoint) / line.length());
-        let dilation = new Dilation(staticEndpoint,
-          newBound.subtract(staticEndpoint).magnitude() / line.length()/* *
-          Math.cos(newBound.angle(staticEndpoint) -
-          this.bound.angle(staticEndpoint))*/);
-        console.log("new angle: " + newBound.angle(staticEndpoint));
-        console.log("old angle: " + this.bound.angle(staticEndpoint));
-        console.log("COS: " + (Math.cos(newBound.angle(staticEndpoint) - this.bound.angle(staticEndpoint))));
-        transformationManager.transform(line.id, dilation);
-        //let bound: Vector = dilation.apply(this.bound) as Vector;
-        transformationManager.transform(line.id, new Rotation(staticEndpoint, newBound.angle(staticEndpoint) - this.bound.angle(staticEndpoint)));
+        let lineTransformation: Transformation = transManager.getTransformation(line.id);
+        let staticEndpointImg: Vector = lineTransformation.apply(arr[1 - i]) as Vector;
+        transManager.transform(line.id, new Dilation(staticEndpointImg,
+          newBound.subtract(staticEndpointImg).magnitude() / (transManager
+            .getImage(line) as LineSegment).length()));
+        transManager.transform(line.id, new Rotation(staticEndpointImg,
+          newBound.angle(staticEndpointImg) - (lineTransformation
+            .apply(this.bound) as Vector).angle(staticEndpointImg)));
       }
     });
   }

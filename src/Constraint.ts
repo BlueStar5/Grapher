@@ -1,3 +1,3 @@
 abstract class Constraint {
-    abstract apply(obj: GeomObject, transformationManager: {});
+    abstract apply(obj: GeomObject, transManager: typeof transformationManager);
 }

@@ -88,8 +88,9 @@ let grapher = (function () {
         plane.addVector(v1);
         plane.addVector(v2);
         plane.addLine(l);
-        //constrain(v1, new OnConstraint(l));
-        constrain(v2, new OnConstraint(l));
+        constrain(v2, new BindsConstraint(l));
+        constrain(v1, new BindsConstraint(l));
+        constrain(l, new BoundedByConstraint(v2));
         constrain(l, new BoundedByConstraint(v1));
         //constrain(v0, new OnConstraint(l));
     }
@@ -97,14 +98,15 @@ let grapher = (function () {
         //translate(v1, new Vector(1, 1));
         //dilate(v0, new Vector(0, 0), 1.02);
         update();
-        requestAnimationFrame(loop);
+        //requestAnimationFrame(loop);
     }
     init();
-    requestAnimationFrame(loop);
+    //requestAnimationFrame(loop);
     return {
         ctx: ctx,
         cam: cam,
         plane: plane,
-        translate: translate
+        translate: translate,
+        loop: loop
     };
 })();

@@ -3,21 +3,17 @@ class BoundedByConstraint extends Constraint {
         super();
         this.bound = bound;
     }
-    apply(line, transformationManager) {
-        let newBound = transformationManager.getImage(this.bound); //transformations[this.bound.id].apply(this.bound);
+    apply(line, transManager) {
+        console.log(line);
+        let newBound = transManager.getImage(this.bound);
         [line.p1, line.p2].forEach((endpoint, i, arr) => {
             if (this.bound.equals(endpoint)) {
-                let staticEndpoint = arr[1 - i];
-                //console.log(newBound.distanceTo(staticEndpoint) / line.length());
-                let dilation = new Dilation(staticEndpoint, newBound.subtract(staticEndpoint).magnitude() / line.length() /* *
-                Math.cos(newBound.angle(staticEndpoint) -
-                this.bound.angle(staticEndpoint))*/);
-                console.log("new angle: " + newBound.angle(staticEndpoint));
-                console.log("old angle: " + this.bound.angle(staticEndpoint));
-                console.log("COS: " + (Math.cos(newBound.angle(staticEndpoint) - this.bound.angle(staticEndpoint))));
-                transformationManager.transform(line.id, dilation);
-                //let bound: Vector = dilation.apply(this.bound) as Vector;
-                transformationManager.transform(line.id, new Rotation(staticEndpoint, newBound.angle(staticEndpoint) - this.bound.angle(staticEndpoint)));
+                let lineTransformation = transManager.getTransformation(line.id);
+                let staticEndpointImg = lineTransformation.apply(arr[1 - i]);
+                transManager.transform(line.id, new Dilation(staticEndpointImg, newBound.subtract(staticEndpointImg).magnitude() / transManager
+                    .getImage(line).length()));
+                transManager.transform(line.id, new Rotation(staticEndpointImg, newBound.angle(staticEndpointImg) - lineTransformation
+                    .apply(this.bound).angle(staticEndpointImg)));
             }
         });
     }
